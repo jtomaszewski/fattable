@@ -71,19 +71,19 @@ class LRUCache
     @data = {}
     @lru_keys = []
 
+  # Returns true if the key k is
+  # already in the cache.
   has: (k) ->
-    # Returns true if the key k is
-    # already in the cache.
     @data.hasOwnProperty k
 
+  # If key k is in the cache,
+  # calls cb immediatly with  as arguments
+  #    - v, the value associated to k
+  #    - k, the key requested for.loca
+  # if not, cb will be called
+  # asynchronously.
+  #if @data.hasOwnProperty(k)
   get: (k) ->
-    # If key k is in the cache,
-    # calls cb immediatly with  as arguments
-    #    - v, the value associated to k
-    #    - k, the key requested for.loca
-    # if not, cb will be called
-    # asynchronously.
-    #if @data.hasOwnProperty(k)
     @data[k]
 
   set: (k,v) ->
@@ -96,6 +96,25 @@ class LRUCache
       delete @data[removeKey]
     @data[k] = v
 
+# This method can get coordinates for both a mouse click
+# or a touch depending on the given event
+getEventPointerCoordinates = (event) ->
+  c =
+    x: 0
+    y: 0
+  if event
+    touches = if event.touches and event.touches.length then event.touches else [ event ]
+    e = event.changedTouches and event.changedTouches[0] or touches[0]
+    if e
+      c.x = e.clientX or e.pageX or 0
+      c.y = e.clientY or e.pageY or 0
+  c
+
+getEventTouches = (e) ->
+  if e.touches and e.touches.length then e.touches else [ {
+    pageX: e.pageX
+    pageY: e.pageY
+  } ]
 
 # =====
 # Fattable CODE
@@ -269,15 +288,15 @@ class EventRegister
 
 
 class ScrollBarProxy
-  constructor: (@container, @headerContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
+  constructor: (@bodyContainer, @headerContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
     @verticalScrollbar = document.createElement "div"
     @verticalScrollbar.className += " fattable-v-scrollbar"
     @horizontalScrollbar = document.createElement "div"
     @horizontalScrollbar.className += " fattable-h-scrollbar"
 
     if @visible
-      @container.appendChild @verticalScrollbar
-      @container.appendChild @horizontalScrollbar
+      @bodyContainer.appendChild @verticalScrollbar
+      @bodyContainer.appendChild @horizontalScrollbar
 
     bigContentHorizontal = document.createElement "div"
     bigContentHorizontal.style.height = 1 + "px";
@@ -308,17 +327,17 @@ class ScrollBarProxy
 
     if @enableDragMove
       # setting up middle click drag
-      eventRegister.bind @container, 'mousedown', (event) =>
+      eventRegister.bind @bodyContainer, 'mousedown', (event) =>
         if event.button == 1
           @dragging = true
-          @container.className = "fattable-body-container fattable-moving"
+          @bodyContainer.className = "fattable-body-container fattable-moving"
           @dragging_dX = @scrollLeft + event.clientX
           @dragging_dY = @scrollTop + event.clientY
-      eventRegister.bind @container, 'mouseup', (event) =>
+      eventRegister.bind @bodyContainer, 'mouseup', (event) =>
         @dragging = false
-        @container.className = "fattable-body-container"
+        @bodyContainer.className = "fattable-body-container"
 
-      eventRegister.bind @container, 'mousemove', (event) =>
+      eventRegister.bind @bodyContainer, 'mousemove', (event) =>
         # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
         deferred = =>
           if @dragging
@@ -326,10 +345,10 @@ class ScrollBarProxy
             newY = -event.clientY + @dragging_dY
             @setScrollXY newX, newY
         window.setTimeout deferred, 0
-      eventRegister.bind @container, 'mouseout', (event) =>
+      eventRegister.bind @bodyContainer, 'mouseout', (event) =>
         if @dragging
-          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @container)
-            @container.className = "fattable-body-container"
+          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @bodyContainer)
+            @bodyContainer.className = "fattable-body-container"
             @dragging = false
 
       # setting up middle click drag on head container
@@ -339,7 +358,7 @@ class ScrollBarProxy
           @headerDragging = true
           @headerContainer.className = "fattable-header-container fattable-moving"
           @dragging_dX = @scrollLeft + event.clientX
-      eventRegister.bind @container, 'mouseup', (event) =>
+      eventRegister.bind @bodyContainer, 'mouseup', (event) =>
         if event.button == 1
           @headerDragging = false
           @headerContainer.className = "fattable-header-container"
@@ -349,7 +368,7 @@ class ScrollBarProxy
           captureClick = (e) ->
             e.stopPropagation()
             @removeEventListener 'click', captureClick, true
-          @container.addEventListener 'click', captureClick, true
+          @bodyContainer.addEventListener 'click', captureClick, true
       eventRegister.bind @headerContainer, 'mousemove', (event) =>
         # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
         deferred = =>
@@ -374,9 +393,9 @@ class ScrollBarProxy
       @maxScrollVertical = 0
 
     supportedEvent = "DOMMouseScroll"
-    if @container.onwheel != undefined
+    if @bodyContainer.onwheel != undefined
       supportedEvent = "wheel"
-    else if @container.onmousewheel != undefined
+    else if @bodyContainer.onmousewheel != undefined
       supportedEvent = "mousewheel"
 
     getDelta = (->
@@ -406,30 +425,65 @@ class ScrollBarProxy
             [deltaX, deltaY]
     )()
 
+    # mouse scroll events
     onMouseWheel = (event) =>
       [deltaX, deltaY] = getDelta event
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop - deltaY
       if has_scrolled
         event.preventDefault()
-
     onMouseWheelHeader = (event) =>
       [deltaX, _] = getDelta event
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop
       if has_scrolled
         event.preventDefault()
-
-    # mouse scroll events
-    eventRegister.bind @container, supportedEvent, onMouseWheel
+    eventRegister.bind @bodyContainer, supportedEvent, onMouseWheel
     eventRegister.bind @headerContainer, supportedEvent, onMouseWheelHeader
+
+    @scroller = new Scroller(@setScrollXY.bind(@), {
+      # some options...
+      # see https://github.com/zynga/scroller
+    })
+    @scroller.setDimensions(@scrollWidth, @scrollHeight, @totalWidth, @totalHeight)
+
+    # touch events
+    onTouchStart = (event) =>
+      @__isTouchDown = true
+      @scroller.doTouchStart(getEventTouches(event), event.timeStamp)
+      event.preventDefault()
+
+    onTouchMove = (event) =>
+      @scroller.doTouchMove(getEventTouches(event), event.timeStamp, event.scale)
+      @__isTouchDown = true
+
+    onTouchEnd = (event) =>
+      return if !@__isTouchDown
+      @scroller.doTouchEnd(event.timeStamp)
+      @__isTouchDown = false
+
+    if `'ontouchstart' in window`
+      eventRegister.bind @bodyContainer, "touchstart", onTouchStart
+      eventRegister.bind @bodyContainer, "touchmove", onTouchMove
+      eventRegister.bind @bodyContainer, "touchend", onTouchEnd
+      eventRegister.bind @bodyContainer, "touchcancel", onTouchEnd
+    else if window.navigator.pointerEnabled
+      eventRegister.bind @bodyContainer, "pointerdown", onTouchStart
+      eventRegister.bind @bodyContainer, "pointermove", onTouchMove
+      eventRegister.bind @bodyContainer, "pointerup", onTouchEnd
+      eventRegister.bind @bodyContainer, "pointercancel", onTouchEnd
+    else if window.navigator.msPointerEnabled
+      eventRegister.bind @bodyContainer, "MSPointerDown", onTouchStart
+      eventRegister.bind @bodyContainer, "MSPointerMove", onTouchMove
+      eventRegister.bind @bodyContainer, "MSPointerUp", onTouchEnd
+      eventRegister.bind @bodyContainer, "MSPointerCancel", onTouchEnd
 
   # Gets called when the view has been scrolled to x,y coordinates.
   onScroll: (x,y) ->
     # This method is replaced by TableView class
 
+  # returns true if we actually scrolled
+  # false is returned if for instance we
+  # reached the bottom of the scrolling area.
   setScrollXY: (x,y) ->
-    # returns true if we actually scrolled
-    # false is returned if for instance we
-    # reached the bottom of the scrolling area.
     has_scrolled = false
     if x?
       x = bound(x, 0, @maxScrollHorizontal)

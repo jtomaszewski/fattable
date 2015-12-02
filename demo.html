@@ -4,6 +4,9 @@
 <head>
 <meta charset="utf-8">
 <style>
+    * {
+      box-sizing: border-box;
+    }
     html {
         height: 100%;
     }
@@ -12,6 +15,8 @@
         overflow: hidden;
         padding: 0;
         margin: 0;
+        width: 500%;
+        background-color: red;
     }
     #container {
         position: absolute;
@@ -42,12 +47,14 @@
     .fattable-body-container > div > div.pending {
         background-color: rgba(255,0,0,0.06);
     }
-    
+
 </style>
 <link rel="stylesheet" type="text/css" href='fattable.css'>
 </head>
 <body>
     <div id='container'></div>
+    <script src='bower_components/scroller/src/Animate.js'></script>
+    <script src='bower_components/scroller/src/Scroller.js'></script>
     <script src='fattable.js'></script>
     <script>
 
@@ -92,7 +99,7 @@
     tableData.getHeaderSync = function(j) {
         return "Column " + j;
     }
-    
+
     var table = fattable({
       "container": "#container",
       "model": tableData,

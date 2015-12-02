@@ -1,5 +1,5 @@
-/* TODO add an offset back... but beware, as it hads 
-    some padding in the scrolling */
+/* TODO add an offset back... but beware, as it hads
+  some padding in the scrolling */
 .fattable-h-scrollbar {
   padding: 0;
   background-color: transparent;
@@ -27,14 +27,6 @@
 }
 .fattable-v-scrollbar > div {
   padding: 0 !important;
-}
-body {
-  width: 500%;
-  background-color: red;
-}
-* {
-  box-sizing: border-box;
-  -moz-box-sizing: border-box;
 }
 .fattable {
   overflow: hidden;
@@ -82,8 +74,7 @@ body {
   position: absolute;
   overflow: hidden;
   /* overflow-x:scroll;
-       overflow-y:scroll;*/
-
+     overflow-y:scroll;*/
   bottom: 0px;
   width: 100%;
 }

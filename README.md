@@ -15,7 +15,7 @@ Also big tables can rapidly grow in sizes. It is not always possible to have cli
 
 This library is
 
- - **light** : no library needed, smaller than 10KB)
+ - **light** : the only library needed is Scroller, but in total with this library it's only about ~25KB)
  - **fast** (only visible element are in DOM, the exact same DOM element are recycled over and over, )
  - **async friendly** : the API makes it simple to fetch your data aysnchronously.
  - **powerful and unbloated** : Design is up to you. Style the table via
@@ -31,15 +31,15 @@ This library is
       "nbRows": 1000000,     // overall number of rows
       "rowHeight": 35,       // constant row height (px)
       "headerHeight": 100,   // height of the header (px)
-      "columnWidths": [300, 300, 300, 300] // array of column width (px) 
-    })  
+      "columnWidths": [300, 300, 300, 300] // array of column width (px)
+    })
 
 ## Painter
 
 ``painter`` is an object which role is to fill the content of your cells, and columnHeaders. It is expected to implement the following interface.
-    
+
     var painter = {
-        
+
         "setupHeader": function(headerDiv) {
             /* Setup method are called at the creation
                of the column header. That is during
@@ -48,7 +48,7 @@ This library is
         }
     ,
         "setupCell": function(cellDiv) {
-            /* The cell painter tells how 
+            /* The cell painter tells how
                to fill, and style cells.
                Do not set height or width.
                in either fill and setup methods. */
@@ -80,12 +80,12 @@ This library is
     ,
         "fillCellPending": function(cellDiv) {
             /* Mark a cell content as pending
-               Its content is not in cache and 
+               Its content is not in cache and
                needs to be fetched */
             cellDiv.textContent = "NA";
         }
     };
-    
+
 
 Actually this very simple implementation is the default.
 And it is available as ``fattable.Painter``, so that you can just
@@ -119,7 +119,7 @@ You just need to extend ``fattable.SyncTableModel`` and implement the following 
 [Demo](http://fulmicoton.com/fattable/index.html)
 
 You probably don't want your backend to receive one request per
-cell displayed. A good solution to this problem is to partition your table into pages of cells. 
+cell displayed. A good solution to this problem is to partition your table into pages of cells.
 
 Queries are only sent when the user stops scrolling.
 
@@ -127,14 +127,14 @@ To use such a system, you just have to extend the ``PagedAsyncTableModel``class 
 
     {
       "cellPageName": function(i,j) {
-          // returns a string which stands for the id of 
+          // returns a string which stands for the id of
           // the page the cell (i,j) belongs to.
           var I = (i / 128) | 0;
           var J = (j / 29) | 0;
           return JSON.stringify([I,J]);
       },
       "fetchCellPage": function(pageName, cb) {
-          // Async method to return the page of 
+          // Async method to return the page of
           var coords = JSON.parse(pageName);
           var I = coords[0];
           var J = coords[1];
@@ -160,7 +160,7 @@ To use such a system, you just have to extend the ``PagedAsyncTableModel``class 
 ### Custom async model
 
 If you want to go custom, you can implement your own data model, it just has to implement the following methods :
-  
+
     {
       hasCell: function(i,j) {
         // returns true if getting the data of the cell (i,j )
@@ -170,7 +170,7 @@ If you want to go custom, you can implement your own data model, it just has to 
         // ... same thing for column header j
       },
       getCell: function(i,j,cb) {
-          // fetch data associated to cell i,j 
+          // fetch data associated to cell i,j
           // and call the callback method cb with it
           // as argument
       },

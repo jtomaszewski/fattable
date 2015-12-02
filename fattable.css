@@ -63,10 +63,7 @@
   right: 0;
 }
 .fattable-viewport > div {
-  padding: 2px;
   position: absolute;
-  font-size: 12px;
-  font-family: sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
 }

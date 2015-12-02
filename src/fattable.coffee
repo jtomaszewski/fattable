@@ -1,6 +1,10 @@
 "use strict"
 
-cumsum = (arr)->
+# =====
+# UTILS
+# =====
+
+cumsum = (arr) ->
   cs = [ 0.0 ]
   s = 0.0
   for x in arr
@@ -8,177 +12,10 @@ cumsum = (arr)->
     cs.push s
   cs
 
-bound = (x, m, M)->
+bound = (x, m, M) ->
   if (x < m) then m else if (x > M) then M else x
 
-class Promise
-
-  constructor: ->
-    @callbacks = []
-    @result = false
-    @resolved = false
-
-  then: (cb)->
-    if @resolved
-      cb @result
-    else
-      @callbacks.push cb
-
-  resolve: (result)->
-    @resolved = true
-    @result = result
-    for cb in @callbacks
-      cb result
-
-domReadyPromise = new Promise()
-
-onLoad = ->
-  document.removeEventListener "DOMContentLoaded", onLoad
-  domReadyPromise.resolve()
-document.addEventListener "DOMContentLoaded", onLoad
-
-
-getTranformPrefix = ->
-  el = document.createElement "div"
-  for testKey in ["transform", "WebkitTransform", "MozTransform", "OTransform", "MsTransform"]
-    if el.style[testKey] != undefined
-      return testKey
-
-prefixedTransformCssKey = getTranformPrefix()
-
-class TableModel
-
-  hasCell: (i,j)-> false
-
-  hasHeader: (j)-> false
-
-  getCell: (i,j, cb=(->))->
-    cb "getCell not implemented"
-
-  getHeader: (j,cb=(->))->
-    cb "getHeader not implemented"
-
-class SyncTableModel extends TableModel
-  # Extends this class if you
-  # don't need to access your data in a asynchronous
-  # fashion (e.g. via ajax).
-  #
-  # You only need to override
-  # getHeaderSync and getCellSync
-
-  getCellSync: (i,j)->
-    # Override me !
-    i + "," + j
-  getHeaderSync: (j)->
-    # Override me !
-    "col " + j
-
-  hasCell: (i,j)-> true
-
-  hasHeader: (j)-> true
-
-  getCell: (i,j, cb=(->))->
-    cb @getCellSync i,j
-
-  getHeader: (j,cb=(->))->
-    cb @getHeaderSync j
-
-
-
-class LRUCache
-
-  constructor: (@size=100)->
-    @data = {}
-    @lru_keys = []
-
-  has: (k)->
-    # Returns true if the key k is
-    # already in the cache.
-    @data.hasOwnProperty k
-
-  get: (k)->
-    # If key k is in the cache,
-    # calls cb immediatly with  as arguments
-    #    - v, the value associated to k
-    #    - k, the key requested for.loca
-    # if not, cb will be called
-    # asynchronously.
-    #if @data.hasOwnProperty(k)
-    @data[k]
-
-  set: (k,v)->
-    idx = @lru_keys.indexOf k
-    if idx >= 0
-      @lru_keys.splice idx, 1
-    @lru_keys.push k
-    if @lru_keys.length >= @size
-      removeKey = @lru_keys.shift()
-      delete @data[removeKey]
-    @data[k] = v
-
-
-
-class PagedAsyncTableModel extends TableModel
-  # Extend this class if you have access
-  # to your data in a page fashion
-  # and you want to use a LRU cache
-  constructor: (cacheSize=100)->
-    @pageCache = new LRUCache cacheSize
-    @headerPageCache = new LRUCache cacheSize
-    @fetchCallbacks = {}
-    @headerFetchCallbacks = {}
-
-  cellPageName: (i,j)->
-    # Override me
-    # Should return a string identifying your page.
-
-  headerPageName: (j)->
-    # Override me
-    # Should return a string identifying the page of the column.
-
-  getHeader: (j)->
-    pageName = @headerPageName j
-    if @headerPageCache.has pageName
-      cb @headerPageCache.get(pageName)(j)
-    else if @headerFetchCallbacks[pageName]?
-      @headerFetchCallbacks[pageName].push [j, cb ]
-    else
-      @headerFetchCallbacks[pageName] = [ [j, cb ] ]
-      @fetchHeaderPage pageName, (page)=>
-        @headerPageCache.set pageName, page
-        for [j,cb] in @headerFetchCallbacks[pageName]
-          cb page(j)
-        delete @headerFetchCallbacks[pageName]
-
-  hasCell: (i,j)->
-    pageName = @cellPageName i,j
-    @pageCache.has pageName
-
-  getCell: (i,j, cb=(->))->
-    pageName = @cellPageName i,j
-    if @pageCache.has pageName
-      cb @pageCache.get(pageName)(i,j)
-    else if @fetchCallbacks[pageName]?
-      @fetchCallbacks[pageName].push [i, j, cb ]
-    else
-      @fetchCallbacks[pageName] = [ [i, j, cb ] ]
-      @fetchCellPage pageName, (page)=>
-        @pageCache.set pageName, page
-        for [i,j,cb] in @fetchCallbacks[pageName]
-          cb page(i,j)
-        delete @fetchCallbacks[pageName]
-
-  fetchCellPage: (pageName, cb)->
-    # override this
-    # a page is a function that
-    # returns the cell value for any (i,j)
-
-  getHeader: (j,cb=(->))->
-    cb("col " + j)
-
-
-binary_search = (arr, x)->
-
+binary_search = (arr, x) ->
   if arr[0] > x
     0
   else
@@ -195,10 +32,10 @@ binary_search = (arr, x)->
         return m
     return a
 
-distance = (a1, a2)->
+distance = (a1, a2) ->
   Math.abs(a2-a1)
 
-closest = (x, vals...)->
+closest = (x, vals...) ->
   d = Infinity
   res = undefined
   for x_ in vals
@@ -208,97 +45,231 @@ closest = (x, vals...)->
       res = x_
   res
 
-
-class Painter
-
-  # The cell painter tells how
-  # to fill, and style cells.
-  # Do not set height or width.
-  # in either fill and setup methods.
-  setupCell: (cellDiv)->
-    # Setup method are called at the creation
-    # of the cells. That is during initialization
-    # and for all window resize event.
-    #
-    # Cells are recycled.
-
-  setupHeader: (headerDiv)->
-    # Setup method are called at the creation
-    # of the column header. That is during
-    # initialization and for all window resize
-    # event.
-    #
-    # Columns are recycled.
-
-  cleanUpCell: (cellDiv)->
-    # Will be called whenever a cell is
-    # put out of the DOM
-
-  cleanUpHeader: (headerDiv)->
-    # Will be called whenever a column is
-    # put out of the DOM
-
-  cleanUp: (table)->
-    for _,cell of table.cells
-      @cleanUpCell cell
-    for _,header of table.columns
-      @cleanUpHeader header
-
-  fillHeader: (headerDiv, data)->
-    # Fills and style a column div.
-    headerDiv.textContent = data
-
-  fillCell: (cellDiv, data)->
-    # Fills and style a cell div.
-    cellDiv.textContent = data
-
-  fillHeaderPending: (headerDiv)->
-    # Mark a column header as pending.
-    # Its content is not in cache
-    # and needs to be fetched
-    headerDiv.textContent = "NA"
-
-  fillCellPending: (cellDiv)->
-    # Mark a cell content as pending
-    # Its content is not in cache and
-    # needs to be fetched
-    cellDiv.textContent = "NA"
-
-
-smallest_diff_subsequence = (arr, w)->
-  # Given an array of positive increasing integers arr
-  # and an integer W, return the smallest integer l
-  # such that arr_{x+l} - arr_{x} is always greater than w.
-  #
-  # If no such l exists, just return arr.length
+# Given an array of positive increasing integers arr
+# and an integer totalWidth, return the smallest integer l
+# such that arr_{x+l} - arr_{x} is always greater than scrollWidth.
+#
+# If no such l exists, just return arr.length
+smallest_diff_subsequence = (arr, scrollWidth) ->
   l = 1
   start = 0
   while start + l < arr.length
-    if arr[start+l] - arr[start] > w
+    if arr[start+l] - arr[start] > scrollWidth
       start += 1
     else
       l += 1
   return l
 
+prefixedTransformCssKey = (->
+  el = document.createElement "div"
+  for testKey in ["transform", "WebkitTransform", "MozTransform", "OTransform", "MsTransform"]
+    if el.style[testKey] != undefined
+      return testKey)()
+
+class LRUCache
+  constructor: (@size=100) ->
+    @data = {}
+    @lru_keys = []
+
+  has: (k) ->
+    # Returns true if the key k is
+    # already in the cache.
+    @data.hasOwnProperty k
+
+  get: (k) ->
+    # If key k is in the cache,
+    # calls cb immediatly with  as arguments
+    #    - v, the value associated to k
+    #    - k, the key requested for.loca
+    # if not, cb will be called
+    # asynchronously.
+    #if @data.hasOwnProperty(k)
+    @data[k]
+
+  set: (k,v) ->
+    idx = @lru_keys.indexOf k
+    if idx >= 0
+      @lru_keys.splice idx, 1
+    @lru_keys.push k
+    if @lru_keys.length >= @size
+      removeKey = @lru_keys.shift()
+      delete @data[removeKey]
+    @data[k] = v
+
+
+# =====
+# Fattable CODE
+# =====
+
+
+class TableModel
+  hasCell: (i,j) -> false
+
+  hasHeader: (j) -> false
+
+  getCell: (i,j, cb=(->)) ->
+    cb "getCell not implemented"
+
+  getHeader: (j,cb=(->)) ->
+    cb "getHeader not implemented"
+
+
+# Extend this class if you
+# don't need to access your data in a asynchronous
+# fashion (e.g. via ajax).
+#
+# You only need to override
+# getHeaderSync and getCellSync
+class SyncTableModel extends TableModel
+  getCellSync: (i,j) ->
+    # Override me !
+    i + "," + j
+
+  getHeaderSync: (j) ->
+    # Override me !
+    "col " + j
+
+  hasCell: (i,j) -> true
+
+  hasHeader: (j) -> true
+
+  getCell: (i,j, cb=(->)) ->
+    cb @getCellSync i,j
+
+  getHeader: (j,cb=(->)) ->
+    cb @getHeaderSync j
+
+
+# Extend this class if you have access
+# to your data in a page fashion
+# and you want to use a LRU cache
+class PagedAsyncTableModel extends TableModel
+  constructor: (cacheSize=100) ->
+    @pageCache = new LRUCache cacheSize
+    @headerPageCache = new LRUCache cacheSize
+    @fetchCallbacks = {}
+    @headerFetchCallbacks = {}
+
+  # Should return a string identifying your page.
+  cellPageName: (i,j) ->
+    # Override me
+
+  # Should return a string identifying the page of the column.
+  headerPageName: (j) ->
+    # Override me
+
+  getHeader: (j) ->
+    pageName = @headerPageName j
+    if @headerPageCache.has pageName
+      cb @headerPageCache.get(pageName)(j)
+    else if @headerFetchCallbacks[pageName]?
+      @headerFetchCallbacks[pageName].push [j, cb ]
+    else
+      @headerFetchCallbacks[pageName] = [ [j, cb ] ]
+      @fetchHeaderPage pageName, (page) =>
+        @headerPageCache.set pageName, page
+        for [j,cb] in @headerFetchCallbacks[pageName]
+          cb page(j)
+        delete @headerFetchCallbacks[pageName]
+
+  hasCell: (i,j) ->
+    pageName = @cellPageName i,j
+    @pageCache.has pageName
+
+  getCell: (i,j, cb=(->)) ->
+    pageName = @cellPageName i,j
+    if @pageCache.has pageName
+      cb @pageCache.get(pageName)(i,j)
+    else if @fetchCallbacks[pageName]?
+      @fetchCallbacks[pageName].push [i, j, cb ]
+    else
+      @fetchCallbacks[pageName] = [ [i, j, cb ] ]
+      @fetchCellPage pageName, (page) =>
+        @pageCache.set pageName, page
+        for [i,j,cb] in @fetchCallbacks[pageName]
+          cb page(i,j)
+        delete @fetchCallbacks[pageName]
+
+  fetchCellPage: (pageName, cb) ->
+    # override this
+    # a page is a function that
+    # returns the cell value for any (i,j)
+
+  getHeader: (j,cb=(->)) ->
+    cb("col " + j)
+
+
+# The cell painter tells how
+# to fill, and style cells.
+# Do not set height or width.
+# in either fill and setup methods.
+class Painter
+  # Setup method are called at the creation
+  # of the cells. That is during initialization
+  # and for all window resize event.
+  #
+  # Cells are recycled.
+  setupCell: (cellDiv) ->
+
+  # Setup method are called at the creation
+  # of the column header. That is during
+  # initialization and for all window resize
+  # event.
+  #
+  # Columns are recycled.
+  setupHeader: (headerDiv) ->
+
+  # Will be called whenever a cell is
+  # put out of the DOM
+  cleanUpCell: (cellDiv) ->
+
+  # Will be called whenever a column is
+  # put out of the DOM
+  cleanUpHeader: (headerDiv) ->
+
+  cleanUp: (table) ->
+    for _,cell of table.cells
+      @cleanUpCell cell
+    for _,header of table.columns
+      @cleanUpHeader header
+
+  # Fills and style a column div.
+  fillHeader: (headerDiv, data) ->
+    headerDiv.textContent = data
+
+  # Fills and style a cell div.
+  fillCell: (cellDiv, data) ->
+    cellDiv.textContent = data
+
+  # Mark a column header as pending.
+  # Its content is not in cache
+  # and needs to be fetched
+  fillHeaderPending: (headerDiv) ->
+    headerDiv.textContent = "NA"
+
+  # Mark a cell content as pending
+  # Its content is not in cache and
+  # needs to be fetched
+  fillCellPending: (cellDiv) ->
+    cellDiv.textContent = "NA"
+
 
 class EventRegister
-
   constructor: ->
     @boundEvents = []
 
-  bind: (target, evt, cb)->
-    @boundEvents.push [target, evt, cb]
-    target.addEventListener evt, cb
+  bind: (target, event, cb) ->
+    @boundEvents.push [target, event, cb]
+    target.addEventListener event, cb
 
   unbindAll: ->
-    for [target, evt, cb] in @boundEvents
-      target.removeEventListener evt, cb
+    for [target, event, cb] in @boundEvents
+      target.removeEventListener event, cb
     @boundEvents = []
 
 
 class ScrollBarProxy
-
-  constructor: (@container, @headerContainer, @W, @H, eventRegister, @visible=true, @enableDragMove=true)->
+  constructor: (@container, @headerContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
     @verticalScrollbar = document.createElement "div"
     @verticalScrollbar.className += " fattable-v-scrollbar"
     @horizontalScrollbar = document.createElement "div"
@@ -310,10 +281,10 @@ class ScrollBarProxy
 
     bigContentHorizontal = document.createElement "div"
     bigContentHorizontal.style.height = 1 + "px";
-    bigContentHorizontal.style.width = @W + "px";
+    bigContentHorizontal.style.width = @totalWidth + "px";
     bigContentVertical = document.createElement "div"
     bigContentVertical.style.width = 1 + "px";
-    bigContentVertical.style.height = @H + "px";
+    bigContentVertical.style.height = @totalHeight + "px";
 
     @horizontalScrollbar.appendChild bigContentHorizontal
     @verticalScrollbar.appendChild bigContentVertical
@@ -328,134 +299,134 @@ class ScrollBarProxy
       if not @dragging
         if @scrollLeft != @horizontalScrollbar.scrollLeft
           @scrollLeft = @horizontalScrollbar.scrollLeft
-          @onScroll @scrollLeft,@scrollTop
+          @onScroll @scrollLeft, @scrollTop
     @verticalScrollbar.onscroll = =>
       if not @dragging
         if @scrollTop != @verticalScrollbar.scrollTop
           @scrollTop = @verticalScrollbar.scrollTop
-          @onScroll @scrollLeft,@scrollTop
-
+          @onScroll @scrollLeft, @scrollTop
 
     if @enableDragMove
       # setting up middle click drag
-      eventRegister.bind @container, 'mousedown', (evt)=>
-        if evt.button == 1
+      eventRegister.bind @container, 'mousedown', (event) =>
+        if event.button == 1
           @dragging = true
           @container.className = "fattable-body-container fattable-moving"
-          @dragging_dX = @scrollLeft + evt.clientX
-          @dragging_dY = @scrollTop + evt.clientY
-      eventRegister.bind @container, 'mouseup', (evt)=>
+          @dragging_dX = @scrollLeft + event.clientX
+          @dragging_dY = @scrollTop + event.clientY
+      eventRegister.bind @container, 'mouseup', (event) =>
         @dragging = false
         @container.className = "fattable-body-container"
 
-      eventRegister.bind @container, 'mousemove', (evt)=>
+      eventRegister.bind @container, 'mousemove', (event) =>
         # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
         deferred = =>
           if @dragging
-            newX = -evt.clientX + @dragging_dX
-            newY = -evt.clientY + @dragging_dY
+            newX = -event.clientX + @dragging_dX
+            newY = -event.clientY + @dragging_dY
             @setScrollXY newX, newY
         window.setTimeout deferred, 0
-      eventRegister.bind @container, 'mouseout', (evt)=>
+      eventRegister.bind @container, 'mouseout', (event) =>
         if @dragging
-          if (not evt.toElement?) || (evt.toElement.parentElement.parentElement != @container)
+          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @container)
             @container.className = "fattable-body-container"
             @dragging = false
 
       # setting up middle click drag on head container
       # (refactor this)
-      eventRegister.bind @headerContainer, 'mousedown', (evt)=>
-        if evt.button == 1
+      eventRegister.bind @headerContainer, 'mousedown', (event) =>
+        if event.button == 1
           @headerDragging = true
           @headerContainer.className = "fattable-header-container fattable-moving"
-          @dragging_dX = @scrollLeft + evt.clientX
-      eventRegister.bind @container, 'mouseup', (evt)=>
-        if evt.button == 1
+          @dragging_dX = @scrollLeft + event.clientX
+      eventRegister.bind @container, 'mouseup', (event) =>
+        if event.button == 1
           @headerDragging = false
           @headerContainer.className = "fattable-header-container"
           # cancel click events
           # if we were actually dragging with the middle button.
-          evt.stopPropagation()
-          captureClick = (e)->
+          event.stopPropagation()
+          captureClick = (e) ->
             e.stopPropagation()
             @removeEventListener 'click', captureClick, true
           @container.addEventListener 'click', captureClick, true
-      eventRegister.bind @headerContainer, 'mousemove', (evt)=>
+      eventRegister.bind @headerContainer, 'mousemove', (event) =>
         # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
         deferred = =>
           if @headerDragging
-            newX = -evt.clientX + @dragging_dX
+            newX = -event.clientX + @dragging_dX
             @setScrollXY newX
         window.setTimeout deferred, 0
-      eventRegister.bind @headerContainer, 'mouseout', (evt)=>
+      eventRegister.bind @headerContainer, 'mouseout', (event) =>
         if @headerDragging
-          if (not evt.toElement?) || (evt.toElement.parentElement.parentElement != @headerContainer)
+          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @headerContainer)
             @headerContainer.className = "fattable-header-container"
           @headerDragging = false
 
-
-    if @W > @horizontalScrollbar.clientWidth
-      @maxScrollHorizontal = @W - @horizontalScrollbar.clientWidth
+    if @totalWidth > @horizontalScrollbar.clientWidth
+      @maxScrollHorizontal = @totalWidth - @horizontalScrollbar.clientWidth
     else
       @maxScrollHorizontal = 0
 
-    if @H > @verticalScrollbar.clientHeight
-      @maxScrollVertical = @H - @verticalScrollbar.clientHeight
+    if @totalHeight > @verticalScrollbar.clientHeight
+      @maxScrollVertical = @totalHeight - @verticalScrollbar.clientHeight
     else
       @maxScrollVertical = 0
 
     supportedEvent = "DOMMouseScroll"
-    if @container.onwheel isnt undefined
+    if @container.onwheel != undefined
       supportedEvent = "wheel"
-    else if @container.onmousewheel isnt undefined
+    else if @container.onmousewheel != undefined
       supportedEvent = "mousewheel"
 
     getDelta = (->
       switch supportedEvent
         when "wheel"
-          (evt)->
-            switch evt.deltaMode
-              when evt.DOM_DELTA_LINE
-                deltaX = -50*evt.deltaX ? 0
-                deltaY = -50*evt.deltaY ? 0
-              when evt.DOM_DELTA_PIXEL
-                deltaX = -1*evt.deltaX ? 0
-                deltaY = -1*evt.deltaY ? 0
+          (event) ->
+            switch event.deltaMode
+              when event.DOM_DELTA_LINE
+                deltaX = -50*event.deltaX ? 0
+                deltaY = -50*event.deltaY ? 0
+              when event.DOM_DELTA_PIXEL
+                deltaX = -1*event.deltaX ? 0
+                deltaY = -1*event.deltaY ? 0
             [deltaX, deltaY]
         when "mousewheel"
-          (evt)->
+          (event) ->
             deltaX = 0
             deltaY = 0
-            deltaX = evt.wheelDeltaX ? 0
-            deltaY = evt.wheelDeltaY ? evt.wheelDelta
+            deltaX = event.wheelDeltaX ? 0
+            deltaY = event.wheelDeltaY ? event.wheelDelta
             [deltaX, deltaY]
         when "DOMMouseScroll"
-          (evt)->
+          (event) ->
             deltaX = 0
             deltaY = 0
-            if evt.axis == evt.HORIZONTAL_AXI then deltaX = -50.0*evt.detail else deltaY = -50.0*evt.detail
+            if event.axis == event.HORIZONTAL_AXI then deltaX = -50.0*event.detail else deltaY = -50.0*event.detail
             [deltaX, deltaY]
     )()
 
-    onMouseWheel = (evt)=>
-      [deltaX, deltaY] = getDelta evt
+    onMouseWheel = (event) =>
+      [deltaX, deltaY] = getDelta event
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop - deltaY
       if has_scrolled
-        evt.preventDefault()
+        event.preventDefault()
 
-
-    onMouseWheelHeader = (evt)=>
-      [deltaX, _] = getDelta evt
+    onMouseWheelHeader = (event) =>
+      [deltaX, _] = getDelta event
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop
       if has_scrolled
-        evt.preventDefault()
+        event.preventDefault()
 
+    # mouse scroll events
     eventRegister.bind @container, supportedEvent, onMouseWheel
     eventRegister.bind @headerContainer, supportedEvent, onMouseWheelHeader
 
-  onScroll: (x,y)->
+  # Gets called when the view has been scrolled to x,y coordinates.
+  onScroll: (x,y) ->
+    # This method is replaced by TableView class
 
-  setScrollXY: (x,y)->
+  setScrollXY: (x,y) ->
     # returns true if we actually scrolled
     # false is returned if for instance we
     # reached the bottom of the scrolling area.
@@ -481,17 +452,7 @@ class ScrollBarProxy
 
 
 class TableView
-
-  readRequiredParameter: (parameters, k, default_value)->
-    if not parameters[k]?
-      if default_value == undefined
-        throw "Expected parameter <" + k + ">"
-      else
-        this[k] = default_value
-    else
-      this[k] = parameters[k]
-
-  constructor: (parameters)->
+  constructor: (parameters) ->
     container = parameters.container
 
     if not container?
@@ -503,37 +464,46 @@ class TableView
     else
       throw "Container must be a string or a dom element."
 
-    @readRequiredParameter parameters, "painter", new Painter()
-    @readRequiredParameter parameters, "autoSetup", true
-    @readRequiredParameter parameters, "model"
-    @readRequiredParameter parameters, "nbRows"
-    @readRequiredParameter parameters, "rowHeight"
-    @readRequiredParameter parameters, "columnWidths"
-    @readRequiredParameter parameters, "rowHeight"
-    @readRequiredParameter parameters, "headerHeight"
-    @readRequiredParameter parameters, "scrollBarVisible", true
-    @readRequiredParameter parameters, "enableDragMove", true
+    @_readRequiredParameter parameters, "painter", new Painter()
+    @_readRequiredParameter parameters, "autoSetup", true
+    @_readRequiredParameter parameters, "model"
+    @_readRequiredParameter parameters, "nbRows"
+    @_readRequiredParameter parameters, "rowHeight"
+    @_readRequiredParameter parameters, "columnWidths"
+    @_readRequiredParameter parameters, "rowHeight"
+    @_readRequiredParameter parameters, "headerHeight"
+    @_readRequiredParameter parameters, "scrollBarVisible", true
+    @_readRequiredParameter parameters, "enableDragMove", true
 
     @nbCols = @columnWidths.length
     if (" "+@container.className+" ").search(/\sfattable\s/) == -1
       @container.className += " fattable"
-    @H = @rowHeight * @nbRows
+    @totalHeight = @rowHeight * @nbRows
     @columnOffset = cumsum @columnWidths
-    @W = @columnOffset[@columnOffset.length-1]
+    @totalWidth = @columnOffset[@columnOffset.length-1]
     @columns = {}
     @cells = {}
     @eventRegister = new EventRegister()
-    @getContainerDimension()
-    if @autoSetup
-      domReadyPromise.then => @setup()
+    @calculateContainerDimensions()
 
-  getContainerDimension: ->
-    @w = @container.offsetWidth
-    @h = @container.offsetHeight - @headerHeight
-    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @w) + 2, @columnWidths.length)
-    @nbRowsVisible = Math.min( (@h / @rowHeight | 0) + 2, @nbRows)
+    @setup() if @autoSetup
 
-  leftTopCornerFromXY: (x,y)->
+  _readRequiredParameter: (parameters, k, default_value) ->
+    if not parameters[k]?
+      if default_value == undefined
+        throw "Expected parameter <" + k + ">"
+      else
+        this[k] = default_value
+    else
+      this[k] = parameters[k]
+
+  calculateContainerDimensions: ->
+    @scrollWidth = @container.offsetWidth
+    @scrollHeight = @container.offsetHeight - @headerHeight
+    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + 2, @columnWidths.length)
+    @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + 2, @nbRows)
+
+  _findLeftTopCornerAtXY: (x,y) ->
     # returns the square
     #   [ i_a -> i_b ]  x  [ j_a, j_b ]
     i = bound (y / @rowHeight | 0), 0, (@nbRows - @nbRowsVisible)
@@ -543,7 +513,7 @@ class TableView
   cleanUp: ->
     # be nice rewind !
     @eventRegister.unbindAll()
-    @scroll?.onScroll = null
+    @scrollProxy?.onScroll = null
     @painter.cleanUp this
     @container.innerHTML = ""
     @bodyContainer = null
@@ -551,7 +521,7 @@ class TableView
 
   setup: ->
     @cleanUp()
-    @getContainerDimension()
+    @calculateContainerDimensions()
 
     # can be called when resizing the window
     @columns = {}
@@ -566,7 +536,7 @@ class TableView
 
     @headerViewport = document.createElement "div"
     @headerViewport.className = "fattable-viewport"
-    @headerViewport.style.width = @w + "px"
+    @headerViewport.style.width = @scrollWidth + "px"
     @headerViewport.style.height = @headerHeight + "px"
     @headerContainer.appendChild @headerViewport
 
@@ -577,8 +547,8 @@ class TableView
 
     @bodyViewport = document.createElement "div"
     @bodyViewport.className = "fattable-viewport"
-    @bodyViewport.style.width = @w + "px"
-    @bodyViewport.style.height = @h + "px"
+    @bodyViewport.style.width = @scrollWidth + "px"
+    @bodyViewport.style.height = @scrollHeight + "px"
 
     for j in [@nbColsVisible ... @nbColsVisible*2] by 1
       for i in [@nbRowsVisible...@nbRowsVisible*2] by 1
@@ -604,9 +574,10 @@ class TableView
     @container.appendChild @headerContainer
     @bodyContainer.appendChild @bodyViewport
     @refreshAllContent()
-    @scroll = new ScrollBarProxy @bodyContainer, @headerContainer, @W, @H, @eventRegister, @scrollBarVisible, @enableDragMove
-    onScroll = (x,y)=>
-      [i,j] = @leftTopCornerFromXY x,y
+
+    @scrollProxy = new ScrollBarProxy @bodyContainer, @headerContainer, @totalWidth, @totalHeight, @eventRegister, @scrollBarVisible, @enableDragMove
+    @scrollProxy.onScroll = (x,y) =>
+      [i,j] = @_findLeftTopCornerAtXY x,y
       @display i,j
       for _, col of @columns
         col.style[prefixedTransformCssKey] = "translate(" + (col.left - x) + "px, 0px)"
@@ -615,34 +586,37 @@ class TableView
       clearTimeout @scrollEndTimer
       @scrollEndTimer = setTimeout @refreshAllContent.bind(this), 200
       @onScroll x,y
-    @scroll.onScroll = onScroll
-    onScroll 0, 0
 
-  refreshAllContent: (evenNotPending=false)->
+    @scrollProxy.onScroll(0, 0)
+
+  refreshAllContent: (evenNotPending=false) ->
     for j in [@firstVisibleColumn ... @firstVisibleColumn + @nbColsVisible] by 1
       header = @columns[j]
-      do (header)=>
+      do (header) =>
         if evenNotPending or header.pending
-          @model.getHeader j, (data)=>
+          @model.getHeader j, (data) =>
             header.pending = false
             @painter.fillHeader header, data
       for i in [@firstVisibleRow ... @firstVisibleRow + @nbRowsVisible] by 1
         k = i + "," + j
         cell = @cells[k]
         if evenNotPending or cell.pending
-          do (cell)=>
-            @model.getCell i,j,(data)=>
+          do (cell) =>
+            @model.getCell i,j,(data) =>
               cell.pending = false
               @painter.fillCell cell,data
 
-  onScroll: (x,y)->
+  # Gets called when view has been scrolled to x,y .
+  # You can replace this method, if you want.
+  onScroll: (x,y) ->
+    # console.debug "TableView.onScroll(#{x}, #{y})"
 
-  goTo: (i,j)->
+  goTo: (i,j) ->
     targetY = if i? then @rowHeight*i else undefined
     targetX = if j? then @columnOffset[j] else undefined
-    @scroll.setScrollXY targetX,  targetY
+    @scrollProxy.setScrollXY targetX, targetY
 
-  display: (i,j)->
+  display: (i,j) ->
     @headerContainer.style.display = "none"
     @bodyContainer.style.display = "none"
     @moveX j
@@ -650,8 +624,7 @@ class TableView
     @headerContainer.style.display = ""
     @bodyContainer.style.display = ""
 
-
-  moveX: (j)->
+  moveX: (j) ->
     last_i = @firstVisibleRow
     last_j = @firstVisibleColumn
     shift_j = j - last_j
@@ -673,7 +646,7 @@ class TableView
       header = @columns[orig_j]
       delete @columns[orig_j]
       if @model.hasHeader dest_j
-        @model.getHeader dest_j, (data)=>
+        @model.getHeader dest_j, (data) =>
           header.pending = false
           @painter.fillHeader header, data
       else if not header.pending
@@ -692,9 +665,9 @@ class TableView
         cell.left = col_x
         # cell.style.left = col_x
         cell.style.width = col_width
-        do (cell)=>
+        do (cell) =>
           if @model.hasCell(i, dest_j)
-            @model.getCell i, dest_j, (data)=>
+            @model.getCell i, dest_j, (data) =>
               cell.pending = false
               @painter.fillCell cell, data
           else if not cell.pending
@@ -702,7 +675,7 @@ class TableView
             @painter.fillCellPending cell
     @firstVisibleColumn = j
 
-  moveY: (i)->
+  moveY: (i) ->
     last_i = @firstVisibleRow
     last_j = @firstVisibleColumn
     shift_i = i - last_i
@@ -724,9 +697,9 @@ class TableView
         delete @cells[k]
         @cells[ dest_i + "," + j] = cell
         cell.top = row_y
-        do (cell)=>
+        do (cell) =>
           if @model.hasCell dest_i, j
-            @model.getCell dest_i, j, (data)=>
+            @model.getCell dest_i, j, (data) =>
               cell.pending = false
               @painter.fillCell cell, data
           else if not cell.pending
@@ -734,7 +707,7 @@ class TableView
             @painter.fillCellPending cell
     @firstVisibleRow = i
 
-fattable = (params)->
+fattable = (params) ->
   new TableView params
 
 ns =
@@ -743,7 +716,6 @@ ns =
   Painter: Painter
   PagedAsyncTableModel: PagedAsyncTableModel
   SyncTableModel: SyncTableModel
-  bound: bound
 
 for k,v of ns
   fattable[k] = v

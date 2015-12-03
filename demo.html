@@ -16,7 +16,9 @@
         padding: 0;
         margin: 0;
         width: 500%;
-        background-color: red;
+        background-color: #5B799E;
+        font-size: 12px;
+        font-family: sans-serif;
     }
     #container {
         position: absolute;
@@ -25,18 +27,25 @@
     }
     .fattable-header-container {
         background-color: #5B799E;
-        border-bottom: solid 5px rgba(0, 0, 0, 0.4);
         text-shadow: 2px 2px 1px rgba(0, 0, 0, 0.4);
         color: #eee;
     }
-    .fattable-header-container > div > div {
+    .fattable-column-header-container {
+        border-bottom: solid 5px rgba(0, 0, 0, 0.4);
+    }
+    .fattable-column-header-container > div > div {
         border-right: solid 1px #475F7C;
+        padding: 10px;
+    }
+    .fattable-row-header-container {
+        border-right: solid 5px rgba(0, 0, 0, 0.4);
+    }
+    .fattable-row-header-container > div > div {
+        border-bottom: solid 1px #475F7C;
         padding: 10px;
     }
     .fattable-body-container {
         background-color: #eee;
-        font-size: 12px;
-        font-family: sans-serif;
     }
     .fattable-body-container > div > div {
         border-right: solid 1px #fff;
@@ -107,7 +116,8 @@
       "model": tableData,
       "nbRows": 80000,
       "rowHeight": 35,
-      "headerHeight": 40,
+      "rowHeaderWidth": 60,
+      "columnHeaderHeight": 40,
       "painter": painter,
       "columnWidths": columnWidths
     });

@@ -166,7 +166,11 @@
       return false;
     };
 
-    TableModel.prototype.hasHeader = function(j) {
+    TableModel.prototype.hasColumnHeader = function(j) {
+      return false;
+    };
+
+    TableModel.prototype.hasRowHeader = function(i) {
       return false;
     };
 
@@ -177,11 +181,18 @@
       return cb("getCell not implemented");
     };
 
-    TableModel.prototype.getHeader = function(j, cb) {
+    TableModel.prototype.getColumnHeader = function(j, cb) {
       if (cb == null) {
         cb = (function() {});
       }
-      return cb("getHeader not implemented");
+      return cb("getColumnHeader not implemented");
+    };
+
+    TableModel.prototype.getRowHeader = function(i, cb) {
+      if (cb == null) {
+        cb = (function() {});
+      }
+      return cb("getRowHeader not implemented");
     };
 
     return TableModel;
@@ -199,15 +210,23 @@
       return i + "," + j;
     };
 
-    SyncTableModel.prototype.getHeaderSync = function(j) {
+    SyncTableModel.prototype.getColumnHeaderSync = function(j) {
       return "col " + j;
+    };
+
+    SyncTableModel.prototype.getRowHeaderSync = function(i) {
+      return "row " + i;
     };
 
     SyncTableModel.prototype.hasCell = function(i, j) {
       return true;
     };
 
-    SyncTableModel.prototype.hasHeader = function(j) {
+    SyncTableModel.prototype.hasColumnHeader = function(j) {
+      return true;
+    };
+
+    SyncTableModel.prototype.hasRowHeader = function(i) {
       return true;
     };
 
@@ -218,11 +237,18 @@
       return cb(this.getCellSync(i, j));
     };
 
-    SyncTableModel.prototype.getHeader = function(j, cb) {
+    SyncTableModel.prototype.getColumnHeader = function(j, cb) {
       if (cb == null) {
         cb = (function() {});
       }
-      return cb(this.getHeaderSync(j));
+      return cb(this.getColumnHeaderSync(j));
+    };
+
+    SyncTableModel.prototype.getRowHeader = function(i, cb) {
+      if (cb == null) {
+        cb = (function() {});
+      }
+      return cb(this.getRowHeaderSync(i));
     };
 
     return SyncTableModel;
@@ -237,34 +263,62 @@
         cacheSize = 100;
       }
       this.pageCache = new LRUCache(cacheSize);
-      this.headerPageCache = new LRUCache(cacheSize);
+      this.columnHeaderPageCache = new LRUCache(cacheSize);
+      this.rowHeaderPageCache = new LRUCache(cacheSize);
       this.fetchCallbacks = {};
-      this.headerFetchCallbacks = {};
+      this.columnHeaderFetchCallbacks = {};
+      this.rowHeaderFetchCallbacks = {};
     }
 
     PagedAsyncTableModel.prototype.cellPageName = function(i, j) {};
 
-    PagedAsyncTableModel.prototype.headerPageName = function(j) {};
+    PagedAsyncTableModel.prototype.columnHeaderPageName = function(j) {};
 
-    PagedAsyncTableModel.prototype.getHeader = function(j) {
+    PagedAsyncTableModel.prototype.rowHeaderPageName = function(i) {};
+
+    PagedAsyncTableModel.prototype.getColumnHeader = function(j) {
       var pageName;
-      pageName = this.headerPageName(j);
-      if (this.headerPageCache.has(pageName)) {
-        return cb(this.headerPageCache.get(pageName)(j));
-      } else if (this.headerFetchCallbacks[pageName] != null) {
-        return this.headerFetchCallbacks[pageName].push([j, cb]);
+      pageName = this.columnHeaderPageName(j);
+      if (this.columnHeaderPageCache.has(pageName)) {
+        return cb(this.columnHeaderPageCache.get(pageName)(j));
+      } else if (this.columnHeaderFetchCallbacks[pageName] != null) {
+        return this.columnHeaderFetchCallbacks[pageName].push([j, cb]);
       } else {
-        this.headerFetchCallbacks[pageName] = [[j, cb]];
-        return this.fetchHeaderPage(pageName, (function(_this) {
+        this.columnHeaderFetchCallbacks[pageName] = [[j, cb]];
+        return this.fetchColumnHeaderPage(pageName, (function(_this) {
           return function(page) {
             var cb, _i, _len, _ref, _ref1;
-            _this.headerPageCache.set(pageName, page);
-            _ref = _this.headerFetchCallbacks[pageName];
+            _this.columnHeaderPageCache.set(pageName, page);
+            _ref = _this.columnHeaderFetchCallbacks[pageName];
             for (_i = 0, _len = _ref.length; _i < _len; _i++) {
               _ref1 = _ref[_i], j = _ref1[0], cb = _ref1[1];
               cb(page(j));
             }
-            return delete _this.headerFetchCallbacks[pageName];
+            return delete _this.columnHeaderFetchCallbacks[pageName];
+          };
+        })(this));
+      }
+    };
+
+    PagedAsyncTableModel.prototype.getRowHeader = function(i) {
+      var pageName;
+      pageName = this.rowHeaderPageName(i);
+      if (this.rowHeaderPageCache.has(pageName)) {
+        return cb(this.rowHeaderPageCache.get(pageName)(i));
+      } else if (this.rowHeaderFetchCallbacks[pageName] != null) {
+        return this.rowHeaderFetchCallbacks[pageName].push([i, cb]);
+      } else {
+        this.rowHeaderFetchCallbacks[pageName] = [[i, cb]];
+        return this.fetchRowHeaderPage(pageName, (function(_this) {
+          return function(page) {
+            var cb, _i, _len, _ref, _ref1;
+            _this.rowHeaderPageCache.set(pageName, page);
+            _ref = _this.rowHeaderFetchCallbacks[pageName];
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              _ref1 = _ref[_i], i = _ref1[0], cb = _ref1[1];
+              cb(page(i));
+            }
+            return delete _this.rowHeaderFetchCallbacks[pageName];
           };
         })(this));
       }
@@ -305,12 +359,9 @@
 
     PagedAsyncTableModel.prototype.fetchCellPage = function(pageName, cb) {};
 
-    PagedAsyncTableModel.prototype.getHeader = function(j, cb) {
-      if (cb == null) {
-        cb = (function() {});
-      }
-      return cb("col " + j);
-    };
+    PagedAsyncTableModel.prototype.fetchColumnHeaderPage = function(pageName, cb) {};
+
+    PagedAsyncTableModel.prototype.fetchRowHeaderPage = function(pageName, cb) {};
 
     return PagedAsyncTableModel;
 
@@ -321,29 +372,42 @@
 
     Painter.prototype.setupCell = function(cellDiv) {};
 
-    Painter.prototype.setupHeader = function(headerDiv) {};
+    Painter.prototype.setupColumnHeader = function(headerDiv) {};
+
+    Painter.prototype.setupRowHeader = function(headerDiv) {};
 
     Painter.prototype.cleanUpCell = function(cellDiv) {};
 
-    Painter.prototype.cleanUpHeader = function(headerDiv) {};
+    Painter.prototype.cleanUpColumnHeader = function(headerDiv) {};
+
+    Painter.prototype.cleanUpRowHeader = function(headerDiv) {};
 
     Painter.prototype.cleanUp = function(table) {
-      var cell, header, _, _ref, _ref1, _results;
+      var cell, header, _, _ref, _ref1, _ref2, _results;
       _ref = table.cells;
       for (_ in _ref) {
         cell = _ref[_];
         this.cleanUpCell(cell);
       }
       _ref1 = table.columns;
-      _results = [];
       for (_ in _ref1) {
         header = _ref1[_];
-        _results.push(this.cleanUpHeader(header));
+        this.cleanUpColumnHeader(header);
+      }
+      _ref2 = table.rows;
+      _results = [];
+      for (_ in _ref2) {
+        header = _ref2[_];
+        _results.push(this.cleanUpRowHeader(header));
       }
       return _results;
     };
 
-    Painter.prototype.fillHeader = function(headerDiv, data) {
+    Painter.prototype.fillColumnHeader = function(headerDiv, data) {
+      return headerDiv.textContent = data;
+    };
+
+    Painter.prototype.fillRowHeader = function(headerDiv, data) {
       return headerDiv.textContent = data;
     };
 
@@ -351,7 +415,11 @@
       return cellDiv.textContent = data;
     };
 
-    Painter.prototype.fillHeaderPending = function(headerDiv) {
+    Painter.prototype.fillColumnHeaderPending = function(headerDiv) {
+      return headerDiv.textContent = "NA";
+    };
+
+    Painter.prototype.fillRowHeaderPending = function(headerDiv) {
       return headerDiv.textContent = "NA";
     };
 
@@ -388,10 +456,11 @@
   })();
 
   ScrollBarProxy = (function() {
-    function ScrollBarProxy(bodyContainer, headerContainer, totalWidth, totalHeight, eventRegister, visible, enableDragMove) {
-      var bigContentHorizontal, bigContentVertical, getDelta, onMouseWheel, onMouseWheelHeader, onTouchEnd, onTouchMove, onTouchStart, supportedEvent;
+    function ScrollBarProxy(bodyContainer, columnHeaderContainer, rowHeaderContainer, totalWidth, totalHeight, eventRegister, visible, enableDragMove) {
+      var bigContentHorizontal, bigContentVertical, getDelta, onMouseWheel, onMouseWheelColumnHeader, onMouseWheelRowHeader, onTouchEnd, onTouchMove, onTouchStart, supportedEvent;
       this.bodyContainer = bodyContainer;
-      this.headerContainer = headerContainer;
+      this.columnHeaderContainer = columnHeaderContainer;
+      this.rowHeaderContainer = rowHeaderContainer;
       this.totalWidth = totalWidth;
       this.totalHeight = totalHeight;
       this.visible = visible != null ? visible : true;
@@ -478,12 +547,21 @@
             }
           };
         })(this));
-        eventRegister.bind(this.headerContainer, 'mousedown', (function(_this) {
+        eventRegister.bind(this.columnHeaderContainer, 'mousedown', (function(_this) {
           return function(event) {
             if (event.button === 1) {
-              _this.headerDragging = true;
-              _this.headerContainer.className = "fattable-header-container fattable-moving";
+              _this.columnHeaderDragging = true;
+              _this.columnHeaderContainer.className = "fattable-header-container fattable-column-header-container fattable-moving";
               return _this.dragging_dX = _this.scrollLeft + event.clientX;
+            }
+          };
+        })(this));
+        eventRegister.bind(this.rowHeaderContainer, 'mousedown', (function(_this) {
+          return function(event) {
+            if (event.button === 1) {
+              _this.rowHeaderDragging = true;
+              _this.rowHeaderContainer.className = "fattable-header-container fattable-row-header-container fattable-moving";
+              return _this.dragging_dY = _this.scrollTop + event.clientY;
             }
           };
         })(this));
@@ -491,8 +569,9 @@
           return function(event) {
             var captureClick;
             if (event.button === 1) {
-              _this.headerDragging = false;
-              _this.headerContainer.className = "fattable-header-container";
+              _this.columnHeaderDragging = false;
+              _this.rowHeaderDragging = false;
+              _this.columnHeaderContainer.className = "fattable-header-container";
               event.stopPropagation();
               captureClick = function(e) {
                 e.stopPropagation();
@@ -502,12 +581,12 @@
             }
           };
         })(this));
-        eventRegister.bind(this.headerContainer, 'mousemove', (function(_this) {
+        eventRegister.bind(this.columnHeaderContainer, 'mousemove', (function(_this) {
           return function(event) {
             var deferred;
             deferred = function() {
               var newX;
-              if (_this.headerDragging) {
+              if (_this.columnHeaderDragging) {
                 newX = -event.clientX + _this.dragging_dX;
                 return _this.setScrollXY(newX);
               }
@@ -515,13 +594,36 @@
             return window.setTimeout(deferred, 0);
           };
         })(this));
-        eventRegister.bind(this.headerContainer, 'mouseout', (function(_this) {
+        eventRegister.bind(this.columnHeaderContainer, 'mouseout', (function(_this) {
           return function(event) {
-            if (_this.headerDragging) {
-              if ((event.toElement == null) || (event.toElement.parentElement.parentElement !== _this.headerContainer)) {
-                _this.headerContainer.className = "fattable-header-container";
+            if (_this.columnHeaderDragging) {
+              if ((event.toElement == null) || (event.toElement.parentElement.parentElement !== _this.columnHeaderContainer)) {
+                _this.columnHeaderContainer.className = "fattable-header-container fattable-column-header-container";
               }
-              return _this.headerDragging = false;
+              return _this.columnHeaderDragging = false;
+            }
+          };
+        })(this));
+        eventRegister.bind(this.rowHeaderContainer, 'mousemove', (function(_this) {
+          return function(event) {
+            var deferred;
+            deferred = function() {
+              var newY;
+              if (_this.rowHeaderDragging) {
+                newY = -event.clientY + _this.dragging_dY;
+                return _this.setScrollXY(void 0, newY);
+              }
+            };
+            return window.setTimeout(deferred, 0);
+          };
+        })(this));
+        eventRegister.bind(this.rowHeaderContainer, 'mouseout', (function(_this) {
+          return function(event) {
+            if (_this.rowHeaderDragging) {
+              if ((event.toElement == null) || (event.toElement.parentElement.parentElement !== _this.rowHeaderContainer)) {
+                _this.rowHeaderContainer.className = "fattable-header-container fattable-row-header-container";
+              }
+              return _this.rowHeaderDragging = false;
             }
           };
         })(this));
@@ -591,7 +693,7 @@
           }
         };
       })(this);
-      onMouseWheelHeader = (function(_this) {
+      onMouseWheelColumnHeader = (function(_this) {
         return function(event) {
           var deltaX, has_scrolled, _, _ref;
           _ref = getDelta(event), deltaX = _ref[0], _ = _ref[1];
@@ -601,8 +703,19 @@
           }
         };
       })(this);
+      onMouseWheelRowHeader = (function(_this) {
+        return function(event) {
+          var deltaY, has_scrolled, _, _ref;
+          _ref = getDelta(event), _ = _ref[0], deltaY = _ref[1];
+          has_scrolled = _this.setScrollXY(_this.scrollLeft, _this.scrollTop - deltaY);
+          if (has_scrolled) {
+            return event.preventDefault();
+          }
+        };
+      })(this);
       eventRegister.bind(this.bodyContainer, supportedEvent, onMouseWheel);
-      eventRegister.bind(this.headerContainer, supportedEvent, onMouseWheelHeader);
+      eventRegister.bind(this.columnHeaderContainer, supportedEvent, onMouseWheelColumnHeader);
+      eventRegister.bind(this.rowHeaderContainer, supportedEvent, onMouseWheelRowHeader);
       this.scroller = new Scroller(this.setScrollXY.bind(this), {});
       this.scroller.setDimensions(this.scrollWidth, this.scrollHeight, this.totalWidth, this.totalHeight);
       onTouchStart = (function(_this) {
@@ -698,8 +811,10 @@
       this._readRequiredParameter(parameters, "nbRows");
       this._readRequiredParameter(parameters, "rowHeight");
       this._readRequiredParameter(parameters, "columnWidths");
-      this._readRequiredParameter(parameters, "rowHeight");
-      this._readRequiredParameter(parameters, "headerHeight");
+      this._readRequiredParameter(parameters, "nbColsOverdraw", 2);
+      this._readRequiredParameter(parameters, "nbRowsOverdraw", 2);
+      this._readRequiredParameter(parameters, "columnHeaderHeight");
+      this._readRequiredParameter(parameters, "rowHeaderWidth");
       this._readRequiredParameter(parameters, "scrollBarVisible", true);
       this._readRequiredParameter(parameters, "enableDragMove", true);
       this.nbCols = this.columnWidths.length;
@@ -709,6 +824,7 @@
       this.totalHeight = this.rowHeight * this.nbRows;
       this.columnOffset = cumsum(this.columnWidths);
       this.totalWidth = this.columnOffset[this.columnOffset.length - 1];
+      this.rows = {};
       this.columns = {};
       this.cells = {};
       this.eventRegister = new EventRegister();
@@ -731,10 +847,10 @@
     };
 
     TableView.prototype.calculateContainerDimensions = function() {
-      this.scrollWidth = this.container.offsetWidth;
-      this.scrollHeight = this.container.offsetHeight - this.headerHeight;
-      this.nbColsVisible = Math.min(smallest_diff_subsequence(this.columnOffset, this.scrollWidth) + 2, this.columnWidths.length);
-      return this.nbRowsVisible = Math.min((this.scrollHeight / this.rowHeight | 0) + 2, this.nbRows);
+      this.scrollWidth = this.container.offsetWidth - this.rowHeaderWidth;
+      this.scrollHeight = this.container.offsetHeight - this.columnHeaderHeight;
+      this.nbColsVisible = Math.min(smallest_diff_subsequence(this.columnOffset, this.scrollWidth) + this.nbColsOverdraw, this.columnWidths.length);
+      return this.nbRowsVisible = Math.min((this.scrollHeight / this.rowHeight | 0) + this.nbRowsOverdraw, this.nbRows);
     };
 
     TableView.prototype._findLeftTopCornerAtXY = function(x, y) {
@@ -753,33 +869,61 @@
       this.painter.cleanUp(this);
       this.container.innerHTML = "";
       this.bodyContainer = null;
-      return this.headerContainer = null;
+      this.columnHeaderContainer = null;
+      return this.rowHeaderContainer = null;
     };
 
     TableView.prototype.setup = function() {
-      var c, el, i, j, _i, _j, _k, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
+      var el, i, j, _i, _j, _k, _l, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
       this.cleanUp();
       this.calculateContainerDimensions();
       this.columns = {};
+      this.rows = {};
       this.cells = {};
       this.container.innerHTML = "";
-      this.headerContainer = document.createElement("div");
-      this.headerContainer.className += " fattable-header-container";
-      this.headerContainer.style.height = this.headerHeight + "px";
-      this.headerViewport = document.createElement("div");
-      this.headerViewport.className = "fattable-viewport";
-      this.headerViewport.style.width = this.scrollWidth + "px";
-      this.headerViewport.style.height = this.headerHeight + "px";
-      this.headerContainer.appendChild(this.headerViewport);
+      this.columnHeaderContainer = document.createElement("div");
+      this.columnHeaderContainer.className += " fattable-header-container fattable-column-header-container";
+      this.columnHeaderContainer.style.width = this.scrollWidth + "px";
+      this.columnHeaderContainer.style.height = this.columnHeaderHeight + "px";
+      this.columnHeaderContainer.style.left = this.rowHeaderWidth + "px";
+      this.columnHeaderViewport = document.createElement("div");
+      this.columnHeaderViewport.className = "fattable-viewport";
+      this.columnHeaderViewport.style.height = this.columnHeaderHeight + "px";
+      this.columnHeaderContainer.appendChild(this.columnHeaderViewport);
+      this.rowHeaderContainer = document.createElement("div");
+      this.rowHeaderContainer.className += " fattable-header-container fattable-row-header-container";
+      this.rowHeaderContainer.style.height = this.scrollHeight + "px";
+      this.rowHeaderContainer.style.width = this.rowHeaderWidth + "px";
+      this.rowHeaderContainer.style.top = this.columnHeaderHeight + "px";
+      this.rowHeaderViewport = document.createElement("div");
+      this.rowHeaderViewport.className = "fattable-viewport";
+      this.rowHeaderContainer.appendChild(this.rowHeaderViewport);
       this.bodyContainer = document.createElement("div");
       this.bodyContainer.className = "fattable-body-container";
-      this.bodyContainer.style.top = this.headerHeight + "px";
+      this.bodyContainer.style.width = this.scrollWidth + "px";
+      this.bodyContainer.style.top = this.columnHeaderHeight + "px";
+      this.bodyContainer.style.left = this.rowHeaderWidth + "px";
       this.bodyViewport = document.createElement("div");
       this.bodyViewport.className = "fattable-viewport";
-      this.bodyViewport.style.width = this.scrollWidth + "px";
       this.bodyViewport.style.height = this.scrollHeight + "px";
       for (j = _i = _ref = this.nbColsVisible, _ref1 = this.nbColsVisible * 2; _i < _ref1; j = _i += 1) {
-        for (i = _j = _ref2 = this.nbRowsVisible, _ref3 = this.nbRowsVisible * 2; _j < _ref3; i = _j += 1) {
+        el = document.createElement("div");
+        el.style.height = this.columnHeaderHeight + "px";
+        el.pending = false;
+        this.painter.setupColumnHeader(el);
+        this.columns[j] = el;
+        this.columnHeaderViewport.appendChild(el);
+      }
+      for (i = _j = _ref2 = this.nbRowsVisible, _ref3 = this.nbRowsVisible * 2; _j < _ref3; i = _j += 1) {
+        el = document.createElement("div");
+        el.style.width = this.rowHeaderWidth + "px";
+        el.pending = false;
+        this.painter.setupRowHeader(el);
+        this.rows[i] = el;
+        this.rowHeaderViewport.appendChild(el);
+      }
+      for (j = _k = _ref4 = this.nbColsVisible, _ref5 = this.nbColsVisible * 2; _k < _ref5; j = _k += 1) {
+        for (i = _l = _ref6 = this.nbRowsVisible, _ref7 = this.nbRowsVisible * 2; _l < _ref7; i = _l += 1) {
           el = document.createElement("div");
           this.painter.setupCell(el);
           el.pending = false;
@@ -788,36 +932,34 @@
           this.cells[i + "," + j] = el;
         }
       }
-      for (c = _k = _ref4 = this.nbColsVisible, _ref5 = this.nbColsVisible * 2; _k < _ref5; c = _k += 1) {
-        el = document.createElement("div");
-        el.style.height = this.headerHeight + "px";
-        el.pending = false;
-        this.painter.setupHeader(el);
-        this.columns[c] = el;
-        this.headerViewport.appendChild(el);
-      }
       this.firstVisibleRow = this.nbRowsVisible;
       this.firstVisibleColumn = this.nbColsVisible;
       this.display(0, 0);
       this.container.appendChild(this.bodyContainer);
-      this.container.appendChild(this.headerContainer);
+      this.container.appendChild(this.columnHeaderContainer);
+      this.container.appendChild(this.rowHeaderContainer);
       this.bodyContainer.appendChild(this.bodyViewport);
       this.refreshAllContent();
-      this.scrollProxy = new ScrollBarProxy(this.bodyContainer, this.headerContainer, this.totalWidth, this.totalHeight, this.eventRegister, this.scrollBarVisible, this.enableDragMove);
+      this.scrollProxy = new ScrollBarProxy(this.bodyContainer, this.columnHeaderContainer, this.rowHeaderContainer, this.totalWidth, this.totalHeight, this.eventRegister, this.scrollBarVisible, this.enableDragMove);
       this.scrollProxy.onScroll = (function(_this) {
         return function(x, y) {
-          var cell, col, _, _ref6, _ref7, _ref8;
-          _ref6 = _this._findLeftTopCornerAtXY(x, y), i = _ref6[0], j = _ref6[1];
+          var cell, col, row, _, _ref10, _ref11, _ref8, _ref9;
+          _ref8 = _this._findLeftTopCornerAtXY(x, y), i = _ref8[0], j = _ref8[1];
           _this.display(i, j);
-          _ref7 = _this.columns;
-          for (_ in _ref7) {
-            col = _ref7[_];
+          _ref9 = _this.cells;
+          for (_ in _ref9) {
+            cell = _ref9[_];
+            cell.style[prefixedTransformCssKey] = "translate(" + (cell.left - x) + "px," + (cell.top - y) + "px)";
+          }
+          _ref10 = _this.columns;
+          for (_ in _ref10) {
+            col = _ref10[_];
             col.style[prefixedTransformCssKey] = "translate(" + (col.left - x) + "px, 0px)";
           }
-          _ref8 = _this.cells;
-          for (_ in _ref8) {
-            cell = _ref8[_];
-            cell.style[prefixedTransformCssKey] = "translate(" + (cell.left - x) + "px," + (cell.top - y) + "px)";
+          _ref11 = _this.rows;
+          for (_ in _ref11) {
+            row = _ref11[_];
+            row.style[prefixedTransformCssKey] = "translate(0px, " + (row.top - y) + "px)";
           }
           clearTimeout(_this.scrollEndTimer);
           _this.scrollEndTimer = setTimeout(_this.refreshAllContent.bind(_this), 200);
@@ -828,45 +970,51 @@
     };
 
     TableView.prototype.refreshAllContent = function(evenNotPending) {
-      var cell, header, i, j, k, _fn, _i, _ref, _ref1, _results;
+      var cell, columnHeader, i, j, k, rowHeader, _fn, _i, _j, _k, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _results;
       if (evenNotPending == null) {
         evenNotPending = false;
       }
       _fn = (function(_this) {
-        return function(header) {
-          if (evenNotPending || header.pending) {
-            return _this.model.getHeader(j, function(data) {
-              header.pending = false;
-              return _this.painter.fillHeader(header, data);
+        return function(columnHeader) {
+          if (evenNotPending || columnHeader.pending) {
+            return _this.model.getColumnHeader(j, function(data) {
+              columnHeader.pending = false;
+              return _this.painter.fillColumnHeader(columnHeader, data);
             });
           }
         };
       })(this);
-      _results = [];
       for (j = _i = _ref = this.firstVisibleColumn, _ref1 = this.firstVisibleColumn + this.nbColsVisible; _i < _ref1; j = _i += 1) {
-        header = this.columns[j];
-        _fn(header);
-        _results.push((function() {
-          var _j, _ref2, _ref3, _results1;
-          _results1 = [];
-          for (i = _j = _ref2 = this.firstVisibleRow, _ref3 = this.firstVisibleRow + this.nbRowsVisible; _j < _ref3; i = _j += 1) {
-            k = i + "," + j;
-            cell = this.cells[k];
-            if (evenNotPending || cell.pending) {
-              _results1.push((function(_this) {
-                return function(cell) {
-                  return _this.model.getCell(i, j, function(data) {
-                    cell.pending = false;
-                    return _this.painter.fillCell(cell, data);
-                  });
-                };
-              })(this)(cell));
-            } else {
-              _results1.push(void 0);
-            }
+        columnHeader = this.columns[j];
+        _fn(columnHeader);
+        for (i = _j = _ref2 = this.firstVisibleRow, _ref3 = this.firstVisibleRow + this.nbRowsVisible; _j < _ref3; i = _j += 1) {
+          k = i + "," + j;
+          cell = this.cells[k];
+          if (evenNotPending || cell.pending) {
+            (function(_this) {
+              return (function(cell) {
+                return _this.model.getCell(i, j, function(data) {
+                  cell.pending = false;
+                  return _this.painter.fillCell(cell, data);
+                });
+              });
+            })(this)(cell);
           }
-          return _results1;
-        }).call(this));
+        }
+      }
+      _results = [];
+      for (i = _k = _ref4 = this.firstVisibleRow, _ref5 = this.firstVisibleRow + this.nbRowsVisible; _k < _ref5; i = _k += 1) {
+        rowHeader = this.rows[i];
+        _results.push((function(_this) {
+          return function(rowHeader) {
+            if (evenNotPending || rowHeader.pending) {
+              return _this.model.getRowHeader(i, function(data) {
+                rowHeader.pending = false;
+                return _this.painter.fillRowHeader(rowHeader, data);
+              });
+            }
+          };
+        })(this)(rowHeader));
       }
       return _results;
     };
@@ -881,16 +1029,18 @@
     };
 
     TableView.prototype.display = function(i, j) {
-      this.headerContainer.style.display = "none";
+      this.columnHeaderContainer.style.display = "none";
+      this.rowHeaderContainer.style.display = "none";
       this.bodyContainer.style.display = "none";
       this.moveX(j);
       this.moveY(i);
-      this.headerContainer.style.display = "";
+      this.columnHeaderContainer.style.display = "";
+      this.rowHeaderContainer.style.display = "";
       return this.bodyContainer.style.display = "";
     };
 
     TableView.prototype.moveX = function(j) {
-      var cell, col_width, col_x, dest_j, dj, header, i, k, last_i, last_j, offset_j, orig_j, shift_j, _fn, _i, _j, _ref;
+      var cell, col_width, col_x, columnHeader, dest_j, dj, i, k, last_i, last_j, offset_j, orig_j, shift_j, _fn, _i, _j, _ref;
       last_i = this.firstVisibleRow;
       last_j = this.firstVisibleColumn;
       shift_j = j - last_j;
@@ -908,22 +1058,22 @@
         }
         col_x = this.columnOffset[dest_j];
         col_width = this.columnWidths[dest_j] + "px";
-        header = this.columns[orig_j];
+        columnHeader = this.columns[orig_j];
         delete this.columns[orig_j];
-        if (this.model.hasHeader(dest_j)) {
-          this.model.getHeader(dest_j, (function(_this) {
+        if (this.model.hasColumnHeader(dest_j)) {
+          this.model.getColumnHeader(dest_j, (function(_this) {
             return function(data) {
-              header.pending = false;
-              return _this.painter.fillHeader(header, data);
+              columnHeader.pending = false;
+              return _this.painter.fillColumnHeader(columnHeader, data);
             };
           })(this));
-        } else if (!header.pending) {
-          header.pending = true;
-          this.painter.fillHeaderPending(header);
+        } else if (!columnHeader.pending) {
+          columnHeader.pending = true;
+          this.painter.fillColumnHeaderPending(columnHeader);
         }
-        header.left = col_x;
-        header.style.width = col_width;
-        this.columns[dest_j] = header;
+        columnHeader.left = col_x;
+        columnHeader.style.width = col_width;
+        this.columns[dest_j] = columnHeader;
         _fn = (function(_this) {
           return function(cell) {
             if (_this.model.hasCell(i, dest_j)) {
@@ -951,7 +1101,7 @@
     };
 
     TableView.prototype.moveY = function(i) {
-      var cell, dest_i, di, j, k, last_i, last_j, offset_i, orig_i, row_y, shift_i, _fn, _i, _j, _ref;
+      var cell, dest_i, di, j, k, last_i, last_j, offset_i, orig_i, rowHeader, row_y, shift_i, _fn, _i, _j, _ref;
       last_i = this.firstVisibleRow;
       last_j = this.firstVisibleColumn;
       shift_i = i - last_i;
@@ -961,13 +1111,28 @@
       di = Math.min(Math.abs(shift_i), this.nbRowsVisible);
       for (offset_i = _i = 0; _i < di; offset_i = _i += 1) {
         if (shift_i > 0) {
-          orig_i = last_i + offset_i;
+          orig_i = this.firstVisibleRow + offset_i;
           dest_i = i + offset_i + this.nbRowsVisible - di;
         } else {
-          orig_i = last_i + this.nbRowsVisible - di + offset_i;
+          orig_i = this.firstVisibleRow + this.nbRowsVisible - di + offset_i;
           dest_i = i + offset_i;
         }
         row_y = dest_i * this.rowHeight;
+        rowHeader = this.rows[orig_i];
+        delete this.rows[orig_i];
+        if (this.model.hasRowHeader(dest_i)) {
+          this.model.getRowHeader(dest_i, (function(_this) {
+            return function(data) {
+              rowHeader.pending = false;
+              return _this.painter.fillRowHeader(rowHeader, data);
+            };
+          })(this));
+        } else if (!rowHeader.pending) {
+          rowHeader.pending = true;
+          this.painter.fillRowHeaderPending(rowHeader);
+        }
+        rowHeader.top = row_y;
+        this.rows[dest_i] = rowHeader;
         _fn = (function(_this) {
           return function(cell) {
             if (_this.model.hasCell(dest_i, j)) {

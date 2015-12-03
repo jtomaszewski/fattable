@@ -124,13 +124,18 @@ getEventTouches = (e) ->
 class TableModel
   hasCell: (i,j) -> false
 
-  hasHeader: (j) -> false
+  hasColumnHeader: (j) -> false
+
+  hasRowHeader: (i) -> false
 
   getCell: (i,j, cb=(->)) ->
     cb "getCell not implemented"
 
-  getHeader: (j,cb=(->)) ->
-    cb "getHeader not implemented"
+  getColumnHeader: (j,cb=(->)) ->
+    cb "getColumnHeader not implemented"
+
+  getRowHeader: (i,cb=(->)) ->
+    cb "getRowHeader not implemented"
 
 
 # Extend this class if you
@@ -144,19 +149,28 @@ class SyncTableModel extends TableModel
     # Override me !
     i + "," + j
 
-  getHeaderSync: (j) ->
+  getColumnHeaderSync: (j) ->
     # Override me !
     "col " + j
 
+  getRowHeaderSync: (i) ->
+    # Override me !
+    "row " + i
+
   hasCell: (i,j) -> true
 
-  hasHeader: (j) -> true
+  hasColumnHeader: (j) -> true
+
+  hasRowHeader: (i) -> true
 
   getCell: (i,j, cb=(->)) ->
     cb @getCellSync i,j
 
-  getHeader: (j,cb=(->)) ->
-    cb @getHeaderSync j
+  getColumnHeader: (j,cb=(->)) ->
+    cb @getColumnHeaderSync j
+
+  getRowHeader: (i,cb=(->)) ->
+    cb @getRowHeaderSync i
 
 
 # Extend this class if you have access
@@ -165,31 +179,51 @@ class SyncTableModel extends TableModel
 class PagedAsyncTableModel extends TableModel
   constructor: (cacheSize=100) ->
     @pageCache = new LRUCache cacheSize
-    @headerPageCache = new LRUCache cacheSize
+    @columnHeaderPageCache = new LRUCache cacheSize
+    @rowHeaderPageCache = new LRUCache cacheSize
     @fetchCallbacks = {}
-    @headerFetchCallbacks = {}
+    @columnHeaderFetchCallbacks = {}
+    @rowHeaderFetchCallbacks = {}
 
   # Should return a string identifying your page.
   cellPageName: (i,j) ->
     # Override me
 
   # Should return a string identifying the page of the column.
-  headerPageName: (j) ->
+  columnHeaderPageName: (j) ->
     # Override me
 
-  getHeader: (j) ->
-    pageName = @headerPageName j
-    if @headerPageCache.has pageName
-      cb @headerPageCache.get(pageName)(j)
-    else if @headerFetchCallbacks[pageName]?
-      @headerFetchCallbacks[pageName].push [j, cb ]
+  # Should return a string identifying the page of the column.
+  rowHeaderPageName: (i) ->
+    # Override me
+
+  getColumnHeader: (j) ->
+    pageName = @columnHeaderPageName j
+    if @columnHeaderPageCache.has pageName
+      cb @columnHeaderPageCache.get(pageName)(j)
+    else if @columnHeaderFetchCallbacks[pageName]?
+      @columnHeaderFetchCallbacks[pageName].push [j, cb ]
     else
-      @headerFetchCallbacks[pageName] = [ [j, cb ] ]
-      @fetchHeaderPage pageName, (page) =>
-        @headerPageCache.set pageName, page
-        for [j,cb] in @headerFetchCallbacks[pageName]
+      @columnHeaderFetchCallbacks[pageName] = [ [j, cb ] ]
+      @fetchColumnHeaderPage pageName, (page) =>
+        @columnHeaderPageCache.set pageName, page
+        for [j,cb] in @columnHeaderFetchCallbacks[pageName]
           cb page(j)
-        delete @headerFetchCallbacks[pageName]
+        delete @columnHeaderFetchCallbacks[pageName]
+
+  getRowHeader: (i) ->
+    pageName = @rowHeaderPageName i
+    if @rowHeaderPageCache.has pageName
+      cb @rowHeaderPageCache.get(pageName)(i)
+    else if @rowHeaderFetchCallbacks[pageName]?
+      @rowHeaderFetchCallbacks[pageName].push [i, cb ]
+    else
+      @rowHeaderFetchCallbacks[pageName] = [ [i, cb ] ]
+      @fetchRowHeaderPage pageName, (page) =>
+        @rowHeaderPageCache.set pageName, page
+        for [i,cb] in @rowHeaderFetchCallbacks[pageName]
+          cb page(i)
+        delete @rowHeaderFetchCallbacks[pageName]
 
   hasCell: (i,j) ->
     pageName = @cellPageName i,j
@@ -214,8 +248,11 @@ class PagedAsyncTableModel extends TableModel
     # a page is a function that
     # returns the cell value for any (i,j)
 
-  getHeader: (j,cb=(->)) ->
-    cb("col " + j)
+  fetchColumnHeaderPage: (pageName, cb) ->
+    # override this
+
+  fetchRowHeaderPage: (pageName, cb) ->
+    # override this
 
 
 # The cell painter tells how
@@ -236,7 +273,9 @@ class Painter
   # event.
   #
   # Columns are recycled.
-  setupHeader: (headerDiv) ->
+  setupColumnHeader: (headerDiv) ->
+
+  setupRowHeader: (headerDiv) ->
 
   # Will be called whenever a cell is
   # put out of the DOM
@@ -244,16 +283,24 @@ class Painter
 
   # Will be called whenever a column is
   # put out of the DOM
-  cleanUpHeader: (headerDiv) ->
+  cleanUpColumnHeader: (headerDiv) ->
+
+  cleanUpRowHeader: (headerDiv) ->
 
   cleanUp: (table) ->
     for _,cell of table.cells
       @cleanUpCell cell
     for _,header of table.columns
-      @cleanUpHeader header
+      @cleanUpColumnHeader header
+    for _,header of table.rows
+      @cleanUpRowHeader header
 
   # Fills and style a column div.
-  fillHeader: (headerDiv, data) ->
+  fillColumnHeader: (headerDiv, data) ->
+    headerDiv.textContent = data
+
+  # Fills and style a row div.
+  fillRowHeader: (headerDiv, data) ->
     headerDiv.textContent = data
 
   # Fills and style a cell div.
@@ -263,7 +310,13 @@ class Painter
   # Mark a column header as pending.
   # Its content is not in cache
   # and needs to be fetched
-  fillHeaderPending: (headerDiv) ->
+  fillColumnHeaderPending: (headerDiv) ->
+    headerDiv.textContent = "NA"
+
+  # Mark a row header as pending.
+  # Its content is not in cache
+  # and needs to be fetched
+  fillRowHeaderPending: (headerDiv) ->
     headerDiv.textContent = "NA"
 
   # Mark a cell content as pending
@@ -288,7 +341,7 @@ class EventRegister
 
 
 class ScrollBarProxy
-  constructor: (@bodyContainer, @headerContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
+  constructor: (@bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
     @verticalScrollbar = document.createElement "div"
     @verticalScrollbar.className += " fattable-v-scrollbar"
     @horizontalScrollbar = document.createElement "div"
@@ -353,15 +406,23 @@ class ScrollBarProxy
 
       # setting up middle click drag on head container
       # (refactor this)
-      eventRegister.bind @headerContainer, 'mousedown', (event) =>
+      eventRegister.bind @columnHeaderContainer, 'mousedown', (event) =>
         if event.button == 1
-          @headerDragging = true
-          @headerContainer.className = "fattable-header-container fattable-moving"
+          @columnHeaderDragging = true
+          @columnHeaderContainer.className = "fattable-header-container fattable-column-header-container fattable-moving"
           @dragging_dX = @scrollLeft + event.clientX
+
+      eventRegister.bind @rowHeaderContainer, 'mousedown', (event) =>
+        if event.button == 1
+          @rowHeaderDragging = true
+          @rowHeaderContainer.className = "fattable-header-container fattable-row-header-container fattable-moving"
+          @dragging_dY = @scrollTop + event.clientY
+
       eventRegister.bind @bodyContainer, 'mouseup', (event) =>
         if event.button == 1
-          @headerDragging = false
-          @headerContainer.className = "fattable-header-container"
+          @columnHeaderDragging = false
+          @rowHeaderDragging = false
+          @columnHeaderContainer.className = "fattable-header-container"
           # cancel click events
           # if we were actually dragging with the middle button.
           event.stopPropagation()
@@ -369,18 +430,32 @@ class ScrollBarProxy
             e.stopPropagation()
             @removeEventListener 'click', captureClick, true
           @bodyContainer.addEventListener 'click', captureClick, true
-      eventRegister.bind @headerContainer, 'mousemove', (event) =>
+
+      eventRegister.bind @columnHeaderContainer, 'mousemove', (event) =>
         # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
         deferred = =>
-          if @headerDragging
+          if @columnHeaderDragging
             newX = -event.clientX + @dragging_dX
             @setScrollXY newX
         window.setTimeout deferred, 0
-      eventRegister.bind @headerContainer, 'mouseout', (event) =>
-        if @headerDragging
-          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @headerContainer)
-            @headerContainer.className = "fattable-header-container"
-          @headerDragging = false
+      eventRegister.bind @columnHeaderContainer, 'mouseout', (event) =>
+        if @columnHeaderDragging
+          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @columnHeaderContainer)
+            @columnHeaderContainer.className = "fattable-header-container fattable-column-header-container"
+          @columnHeaderDragging = false
+
+      eventRegister.bind @rowHeaderContainer, 'mousemove', (event) =>
+        # Firefox pb see https://bugzilla.mozilla.org/show_bug.cgi?id=732621
+        deferred = =>
+          if @rowHeaderDragging
+            newY = -event.clientY + @dragging_dY
+            @setScrollXY undefined, newY
+        window.setTimeout deferred, 0
+      eventRegister.bind @rowHeaderContainer, 'mouseout', (event) =>
+        if @rowHeaderDragging
+          if (not event.toElement?) || (event.toElement.parentElement.parentElement != @rowHeaderContainer)
+            @rowHeaderContainer.className = "fattable-header-container fattable-row-header-container"
+          @rowHeaderDragging = false
 
     if @totalWidth > @horizontalScrollbar.clientWidth
       @maxScrollHorizontal = @totalWidth - @horizontalScrollbar.clientWidth
@@ -431,13 +506,22 @@ class ScrollBarProxy
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop - deltaY
       if has_scrolled
         event.preventDefault()
-    onMouseWheelHeader = (event) =>
+
+    onMouseWheelColumnHeader = (event) =>
       [deltaX, _] = getDelta event
       has_scrolled = @setScrollXY @scrollLeft - deltaX, @scrollTop
       if has_scrolled
         event.preventDefault()
+
+    onMouseWheelRowHeader = (event) =>
+      [_, deltaY] = getDelta event
+      has_scrolled = @setScrollXY @scrollLeft, @scrollTop - deltaY
+      if has_scrolled
+        event.preventDefault()
+
     eventRegister.bind @bodyContainer, supportedEvent, onMouseWheel
-    eventRegister.bind @headerContainer, supportedEvent, onMouseWheelHeader
+    eventRegister.bind @columnHeaderContainer, supportedEvent, onMouseWheelColumnHeader
+    eventRegister.bind @rowHeaderContainer, supportedEvent, onMouseWheelRowHeader
 
     @scroller = new Scroller(@setScrollXY.bind(@), {
       # some options...
@@ -524,11 +608,12 @@ class TableView
     @_readRequiredParameter parameters, "nbRows"
     @_readRequiredParameter parameters, "rowHeight"
     @_readRequiredParameter parameters, "columnWidths"
-    @_readRequiredParameter parameters, "headerHeight"
+    @_readRequiredParameter parameters, "nbColsOverdraw", 2
+    @_readRequiredParameter parameters, "nbRowsOverdraw", 2
+    @_readRequiredParameter parameters, "columnHeaderHeight"
+    @_readRequiredParameter parameters, "rowHeaderWidth"
     @_readRequiredParameter parameters, "scrollBarVisible", true
     @_readRequiredParameter parameters, "enableDragMove", true
-    @_readRequiredParameter parameters, "colsOverlimit", 2
-    @_readRequiredParameter parameters, "rowsOverlimit", 2
 
     @nbCols = @columnWidths.length
     if (" "+@container.className+" ").search(/\sfattable\s/) == -1
@@ -536,6 +621,7 @@ class TableView
     @totalHeight = @rowHeight * @nbRows
     @columnOffset = cumsum @columnWidths
     @totalWidth = @columnOffset[@columnOffset.length-1]
+    @rows = {}
     @columns = {}
     @cells = {}
     @eventRegister = new EventRegister()
@@ -553,10 +639,10 @@ class TableView
       this[k] = parameters[k]
 
   calculateContainerDimensions: ->
-    @scrollWidth = @container.offsetWidth
-    @scrollHeight = @container.offsetHeight - @headerHeight
-    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + @colsOverlimit, @columnWidths.length)
-    @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + @rowsOverlimit, @nbRows)
+    @scrollWidth = @container.offsetWidth - @rowHeaderWidth
+    @scrollHeight = @container.offsetHeight - @columnHeaderHeight
+    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + @nbColsOverdraw, @columnWidths.length)
+    @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + @nbRowsOverdraw, @nbRows)
 
   _findLeftTopCornerAtXY: (x,y) ->
     # returns the square
@@ -572,7 +658,8 @@ class TableView
     @painter.cleanUp this
     @container.innerHTML = ""
     @bodyContainer = null
-    @headerContainer = null
+    @columnHeaderContainer = null
+    @rowHeaderContainer = null
 
   setup: ->
     @cleanUp()
@@ -580,30 +667,60 @@ class TableView
 
     # can be called when resizing the window
     @columns = {}
+    @rows = {}
     @cells = {}
 
     @container.innerHTML = ""
 
-    # header container
-    @headerContainer = document.createElement "div"
-    @headerContainer.className += " fattable-header-container";
-    @headerContainer.style.height = @headerHeight + "px";
+    # column header container
+    @columnHeaderContainer = document.createElement "div"
+    @columnHeaderContainer.className += " fattable-header-container fattable-column-header-container"
+    @columnHeaderContainer.style.width = @scrollWidth + "px"
+    @columnHeaderContainer.style.height = @columnHeaderHeight + "px"
+    @columnHeaderContainer.style.left = @rowHeaderWidth + "px"
 
-    @headerViewport = document.createElement "div"
-    @headerViewport.className = "fattable-viewport"
-    @headerViewport.style.width = @scrollWidth + "px"
-    @headerViewport.style.height = @headerHeight + "px"
-    @headerContainer.appendChild @headerViewport
+    @columnHeaderViewport = document.createElement "div"
+    @columnHeaderViewport.className = "fattable-viewport"
+    @columnHeaderViewport.style.height = @columnHeaderHeight + "px"
+    @columnHeaderContainer.appendChild @columnHeaderViewport
+
+    # row header container
+    @rowHeaderContainer = document.createElement "div"
+    @rowHeaderContainer.className += " fattable-header-container fattable-row-header-container"
+    @rowHeaderContainer.style.height = @scrollHeight + "px"
+    @rowHeaderContainer.style.width = @rowHeaderWidth + "px"
+    @rowHeaderContainer.style.top = @columnHeaderHeight + "px"
+
+    @rowHeaderViewport = document.createElement "div"
+    @rowHeaderViewport.className = "fattable-viewport"
+    @rowHeaderContainer.appendChild @rowHeaderViewport
 
     # body container
     @bodyContainer = document.createElement "div"
-    @bodyContainer.className = "fattable-body-container";
-    @bodyContainer.style.top = @headerHeight + "px";
+    @bodyContainer.className = "fattable-body-container"
+    @bodyContainer.style.width = @scrollWidth + "px"
+    @bodyContainer.style.top = @columnHeaderHeight + "px"
+    @bodyContainer.style.left = @rowHeaderWidth + "px"
 
     @bodyViewport = document.createElement "div"
     @bodyViewport.className = "fattable-viewport"
-    @bodyViewport.style.width = @scrollWidth + "px"
     @bodyViewport.style.height = @scrollHeight + "px"
+
+    for j in [@nbColsVisible...@nbColsVisible*2] by 1
+      el = document.createElement "div"
+      el.style.height = @columnHeaderHeight + "px"
+      el.pending = false
+      @painter.setupColumnHeader el
+      @columns[j] = el
+      @columnHeaderViewport.appendChild el
+
+    for i in [@nbRowsVisible...@nbRowsVisible*2] by 1
+      el = document.createElement "div"
+      el.style.width = @rowHeaderWidth + "px"
+      el.pending = false
+      @painter.setupRowHeader el
+      @rows[i] = el
+      @rowHeaderViewport.appendChild el
 
     for j in [@nbColsVisible ... @nbColsVisible*2] by 1
       for i in [@nbRowsVisible...@nbRowsVisible*2] by 1
@@ -614,30 +731,25 @@ class TableView
         @bodyViewport.appendChild el
         @cells[i + "," + j] = el
 
-    for c in [@nbColsVisible...@nbColsVisible*2] by 1
-      el = document.createElement "div"
-      el.style.height = @headerHeight + "px"
-      el.pending = false
-      @painter.setupHeader el
-      @columns[c] = el
-      @headerViewport.appendChild el
-
     @firstVisibleRow = @nbRowsVisible
     @firstVisibleColumn = @nbColsVisible
     @display 0,0
     @container.appendChild @bodyContainer
-    @container.appendChild @headerContainer
+    @container.appendChild @columnHeaderContainer
+    @container.appendChild @rowHeaderContainer
     @bodyContainer.appendChild @bodyViewport
     @refreshAllContent()
 
-    @scrollProxy = new ScrollBarProxy @bodyContainer, @headerContainer, @totalWidth, @totalHeight, @eventRegister, @scrollBarVisible, @enableDragMove
+    @scrollProxy = new ScrollBarProxy @bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, @eventRegister, @scrollBarVisible, @enableDragMove
     @scrollProxy.onScroll = (x,y) =>
       [i,j] = @_findLeftTopCornerAtXY x,y
       @display i,j
-      for _, col of @columns
-        col.style[prefixedTransformCssKey] = "translate(" + (col.left - x) + "px, 0px)"
       for _, cell of @cells
         cell.style[prefixedTransformCssKey] = "translate(" + (cell.left - x) + "px," + (cell.top - y) + "px)"
+      for _, col of @columns
+        col.style[prefixedTransformCssKey] = "translate(" + (col.left - x) + "px, 0px)"
+      for _, row of @rows
+        row.style[prefixedTransformCssKey] = "translate(0px, " + (row.top - y) + "px)"
       clearTimeout @scrollEndTimer
       @scrollEndTimer = setTimeout @refreshAllContent.bind(this), 200
       @onScroll x,y
@@ -646,12 +758,13 @@ class TableView
 
   refreshAllContent: (evenNotPending=false) ->
     for j in [@firstVisibleColumn ... @firstVisibleColumn + @nbColsVisible] by 1
-      header = @columns[j]
-      do (header) =>
-        if evenNotPending or header.pending
-          @model.getHeader j, (data) =>
-            header.pending = false
-            @painter.fillHeader header, data
+      columnHeader = @columns[j]
+      do (columnHeader) =>
+        if evenNotPending or columnHeader.pending
+          @model.getColumnHeader j, (data) =>
+            columnHeader.pending = false
+            @painter.fillColumnHeader columnHeader, data
+
       for i in [@firstVisibleRow ... @firstVisibleRow + @nbRowsVisible] by 1
         k = i + "," + j
         cell = @cells[k]
@@ -660,6 +773,14 @@ class TableView
             @model.getCell i,j,(data) =>
               cell.pending = false
               @painter.fillCell cell,data
+
+    for i in [@firstVisibleRow ... @firstVisibleRow + @nbRowsVisible] by 1
+      rowHeader = @rows[i]
+      do (rowHeader) =>
+        if evenNotPending or rowHeader.pending
+          @model.getRowHeader i, (data) =>
+            rowHeader.pending = false
+            @painter.fillRowHeader rowHeader, data
 
   # Gets called when view has been scrolled to x,y .
   # You can replace this method, if you want.
@@ -672,11 +793,13 @@ class TableView
     @scrollProxy.setScrollXY targetX, targetY
 
   display: (i,j) ->
-    @headerContainer.style.display = "none"
+    @columnHeaderContainer.style.display = "none"
+    @rowHeaderContainer.style.display = "none"
     @bodyContainer.style.display = "none"
     @moveX j
     @moveY i
-    @headerContainer.style.display = ""
+    @columnHeaderContainer.style.display = ""
+    @rowHeaderContainer.style.display = ""
     @bodyContainer.style.display = ""
 
   moveX: (j) ->
@@ -698,18 +821,18 @@ class TableView
       col_width = @columnWidths[dest_j] + "px"
 
       # move the column header
-      header = @columns[orig_j]
+      columnHeader = @columns[orig_j]
       delete @columns[orig_j]
-      if @model.hasHeader dest_j
-        @model.getHeader dest_j, (data) =>
-          header.pending = false
-          @painter.fillHeader header, data
-      else if not header.pending
-        header.pending = true
-        @painter.fillHeaderPending header
-      header.left = col_x
-      header.style.width = col_width
-      @columns[dest_j] = header
+      if @model.hasColumnHeader dest_j
+        @model.getColumnHeader dest_j, (data) =>
+          columnHeader.pending = false
+          @painter.fillColumnHeader columnHeader, data
+      else if not columnHeader.pending
+        columnHeader.pending = true
+        @painter.fillColumnHeaderPending columnHeader
+      columnHeader.left = col_x
+      columnHeader.style.width = col_width
+      @columns[dest_j] = columnHeader
 
       # move the cells.
       for i in [ last_i...last_i + @nbRowsVisible] by 1
@@ -718,7 +841,6 @@ class TableView
         delete @cells[k]
         @cells[ i + "," + dest_j] = cell
         cell.left = col_x
-        # cell.style.left = col_x
         cell.style.width = col_width
         do (cell) =>
           if @model.hasCell(i, dest_j)
@@ -728,6 +850,7 @@ class TableView
           else if not cell.pending
             cell.pending = true
             @painter.fillCellPending cell
+
     @firstVisibleColumn = j
 
   moveY: (i) ->
@@ -736,30 +859,46 @@ class TableView
     shift_i = i - last_i
     if shift_i == 0
       return
-    di = Math.min( Math.abs(shift_i), @nbRowsVisible)
+    di = Math.min(Math.abs(shift_i), @nbRowsVisible)
+
     for offset_i in [0 ... di ] by 1
       if shift_i>0
-        orig_i = last_i + offset_i
+        orig_i = @firstVisibleRow + offset_i
         dest_i = i + offset_i + @nbRowsVisible - di
       else
-        orig_i = last_i + @nbRowsVisible - di + offset_i
+        orig_i = @firstVisibleRow + @nbRowsVisible - di + offset_i
         dest_i = i + offset_i
       row_y = dest_i * @rowHeight
+
+      # move the row header
+      rowHeader = @rows[orig_i]
+      delete @rows[orig_i]
+      if @model.hasRowHeader dest_i
+        @model.getRowHeader dest_i, (data) =>
+          rowHeader.pending = false
+          @painter.fillRowHeader rowHeader, data
+      else if not rowHeader.pending
+        rowHeader.pending = true
+        @painter.fillRowHeaderPending rowHeader
+      rowHeader.top = row_y
+      @rows[dest_i] = rowHeader
+
       # move the cells.
-      for j in [last_j...last_j+@nbColsVisible] by 1
+      for j in [ last_j...last_j + @nbColsVisible] by 1
         k =  orig_i  + "," + j
         cell = @cells[k]
         delete @cells[k]
         @cells[ dest_i + "," + j] = cell
         cell.top = row_y
         do (cell) =>
-          if @model.hasCell dest_i, j
+          if @model.hasCell(dest_i, j)
             @model.getCell dest_i, j, (data) =>
               cell.pending = false
               @painter.fillCell cell, data
           else if not cell.pending
             cell.pending = true
             @painter.fillCellPending cell
+
     @firstVisibleRow = i
 
 fattable = (params) ->

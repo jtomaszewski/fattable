@@ -341,15 +341,16 @@ class EventRegister
 
 
 class ScrollBarProxy
-  constructor: (@bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, eventRegister, @visible=true, @enableDragMove=true) ->
+  constructor: (@bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, eventRegister, @horizontalScrollbarVisible=true, @verticalScrollbarVisible=true, @enableDragMove=true) ->
     @verticalScrollbar = document.createElement "div"
     @verticalScrollbar.className += " fattable-v-scrollbar"
+    @verticalScrollbar.style.visibility = "hidden" if !@verticalScrollbarVisible
     @horizontalScrollbar = document.createElement "div"
     @horizontalScrollbar.className += " fattable-h-scrollbar"
+    @horizontalScrollbar.style.visibility = "hidden" if !@horizontalScrollbarVisible
 
-    if @visible
-      @bodyContainer.appendChild @verticalScrollbar
-      @bodyContainer.appendChild @horizontalScrollbar
+    @bodyContainer.appendChild @horizontalScrollbar
+    @bodyContainer.appendChild @verticalScrollbar
 
     bigContentHorizontal = document.createElement "div"
     bigContentHorizontal.style.height = 1 + "px";
@@ -613,6 +614,8 @@ class TableView
     @_readRequiredParameter parameters, "columnHeaderHeight"
     @_readRequiredParameter parameters, "rowHeaderWidth"
     @_readRequiredParameter parameters, "scrollBarVisible", true
+    @_readRequiredParameter parameters, "horizontalScrollbar", @scrollBarVisible
+    @_readRequiredParameter parameters, "verticalScrollbar", @scrollBarVisible
     @_readRequiredParameter parameters, "enableDragMove", true
 
     @nbCols = @columnWidths.length
@@ -643,6 +646,8 @@ class TableView
     @scrollHeight = @container.offsetHeight - @columnHeaderHeight
     @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + @nbColsOverdraw, @columnWidths.length)
     @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + @nbRowsOverdraw, @nbRows)
+    @horizontalScrollbar = false if @totalWidth <= @scrollWidth
+    @verticalScrollbar = false if @totalHeight <= @scrollHeight
 
   _findLeftTopCornerAtXY: (x,y) ->
     # returns the square
@@ -740,7 +745,7 @@ class TableView
     @bodyContainer.appendChild @bodyViewport
     @refreshAllContent()
 
-    @scrollProxy = new ScrollBarProxy @bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, @eventRegister, @scrollBarVisible, @enableDragMove
+    @scrollProxy = new ScrollBarProxy @bodyContainer, @columnHeaderContainer, @rowHeaderContainer, @totalWidth, @totalHeight, @eventRegister, @horizontalScrollbar, @verticalScrollbar, @enableDragMove
     @scrollProxy.onScroll = (x,y) =>
       [i,j] = @_findLeftTopCornerAtXY x,y
       @display i,j

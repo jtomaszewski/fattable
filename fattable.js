@@ -456,23 +456,28 @@
   })();
 
   ScrollBarProxy = (function() {
-    function ScrollBarProxy(bodyContainer, columnHeaderContainer, rowHeaderContainer, totalWidth, totalHeight, eventRegister, visible, enableDragMove) {
+    function ScrollBarProxy(bodyContainer, columnHeaderContainer, rowHeaderContainer, totalWidth, totalHeight, eventRegister, horizontalScrollbarVisible, verticalScrollbarVisible, enableDragMove) {
       var bigContentHorizontal, bigContentVertical, getDelta, onMouseWheel, onMouseWheelColumnHeader, onMouseWheelRowHeader, onTouchEnd, onTouchMove, onTouchStart, supportedEvent;
       this.bodyContainer = bodyContainer;
       this.columnHeaderContainer = columnHeaderContainer;
       this.rowHeaderContainer = rowHeaderContainer;
       this.totalWidth = totalWidth;
       this.totalHeight = totalHeight;
-      this.visible = visible != null ? visible : true;
+      this.horizontalScrollbarVisible = horizontalScrollbarVisible != null ? horizontalScrollbarVisible : true;
+      this.verticalScrollbarVisible = verticalScrollbarVisible != null ? verticalScrollbarVisible : true;
       this.enableDragMove = enableDragMove != null ? enableDragMove : true;
       this.verticalScrollbar = document.createElement("div");
       this.verticalScrollbar.className += " fattable-v-scrollbar";
+      if (!this.verticalScrollbarVisible) {
+        this.verticalScrollbar.style.visibility = "hidden";
+      }
       this.horizontalScrollbar = document.createElement("div");
       this.horizontalScrollbar.className += " fattable-h-scrollbar";
-      if (this.visible) {
-        this.bodyContainer.appendChild(this.verticalScrollbar);
-        this.bodyContainer.appendChild(this.horizontalScrollbar);
+      if (!this.horizontalScrollbarVisible) {
+        this.horizontalScrollbar.style.visibility = "hidden";
       }
+      this.bodyContainer.appendChild(this.horizontalScrollbar);
+      this.bodyContainer.appendChild(this.verticalScrollbar);
       bigContentHorizontal = document.createElement("div");
       bigContentHorizontal.style.height = 1 + "px";
       bigContentHorizontal.style.width = this.totalWidth + "px";
@@ -816,6 +821,8 @@
       this._readRequiredParameter(parameters, "columnHeaderHeight");
       this._readRequiredParameter(parameters, "rowHeaderWidth");
       this._readRequiredParameter(parameters, "scrollBarVisible", true);
+      this._readRequiredParameter(parameters, "horizontalScrollbar", this.scrollBarVisible);
+      this._readRequiredParameter(parameters, "verticalScrollbar", this.scrollBarVisible);
       this._readRequiredParameter(parameters, "enableDragMove", true);
       this.nbCols = this.columnWidths.length;
       if ((" " + this.container.className + " ").search(/\sfattable\s/) === -1) {
@@ -850,7 +857,13 @@
       this.scrollWidth = this.container.offsetWidth - this.rowHeaderWidth;
       this.scrollHeight = this.container.offsetHeight - this.columnHeaderHeight;
       this.nbColsVisible = Math.min(smallest_diff_subsequence(this.columnOffset, this.scrollWidth) + this.nbColsOverdraw, this.columnWidths.length);
-      return this.nbRowsVisible = Math.min((this.scrollHeight / this.rowHeight | 0) + this.nbRowsOverdraw, this.nbRows);
+      this.nbRowsVisible = Math.min((this.scrollHeight / this.rowHeight | 0) + this.nbRowsOverdraw, this.nbRows);
+      if (this.totalWidth <= this.scrollWidth) {
+        this.horizontalScrollbar = false;
+      }
+      if (this.totalHeight <= this.scrollHeight) {
+        return this.verticalScrollbar = false;
+      }
     };
 
     TableView.prototype._findLeftTopCornerAtXY = function(x, y) {
@@ -940,7 +953,7 @@
       this.container.appendChild(this.rowHeaderContainer);
       this.bodyContainer.appendChild(this.bodyViewport);
       this.refreshAllContent();
-      this.scrollProxy = new ScrollBarProxy(this.bodyContainer, this.columnHeaderContainer, this.rowHeaderContainer, this.totalWidth, this.totalHeight, this.eventRegister, this.scrollBarVisible, this.enableDragMove);
+      this.scrollProxy = new ScrollBarProxy(this.bodyContainer, this.columnHeaderContainer, this.rowHeaderContainer, this.totalWidth, this.totalHeight, this.eventRegister, this.horizontalScrollbar, this.verticalScrollbar, this.enableDragMove);
       this.scrollProxy.onScroll = (function(_this) {
         return function(x, y) {
           var cell, col, row, _, _ref10, _ref11, _ref8, _ref9;
@@ -967,6 +980,13 @@
         };
       })(this);
       return this.scrollProxy.onScroll(0, 0);
+    };
+
+    TableView.prototype.resize = function() {
+      var scrollLeft, scrollTop, _ref;
+      _ref = this.scrollProxy, scrollLeft = _ref.scrollLeft, scrollTop = _ref.scrollTop;
+      this.setup();
+      return this.scrollProxy.setScrollXY(scrollLeft, scrollTop);
     };
 
     TableView.prototype.refreshAllContent = function(evenNotPending) {

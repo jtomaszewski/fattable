@@ -756,6 +756,11 @@ class TableView
 
     @scrollProxy.onScroll(0, 0)
 
+  resize: ->
+    {scrollLeft, scrollTop} = @scrollProxy
+    @setup()
+    @scrollProxy.setScrollXY(scrollLeft, scrollTop)
+
   refreshAllContent: (evenNotPending=false) ->
     for j in [@firstVisibleColumn ... @firstVisibleColumn + @nbColsVisible] by 1
       columnHeader = @columns[j]

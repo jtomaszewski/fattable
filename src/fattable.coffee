@@ -524,10 +524,11 @@ class TableView
     @_readRequiredParameter parameters, "nbRows"
     @_readRequiredParameter parameters, "rowHeight"
     @_readRequiredParameter parameters, "columnWidths"
-    @_readRequiredParameter parameters, "rowHeight"
     @_readRequiredParameter parameters, "headerHeight"
     @_readRequiredParameter parameters, "scrollBarVisible", true
     @_readRequiredParameter parameters, "enableDragMove", true
+    @_readRequiredParameter parameters, "colsOverlimit", 2
+    @_readRequiredParameter parameters, "rowsOverlimit", 2
 
     @nbCols = @columnWidths.length
     if (" "+@container.className+" ").search(/\sfattable\s/) == -1
@@ -554,8 +555,8 @@ class TableView
   calculateContainerDimensions: ->
     @scrollWidth = @container.offsetWidth
     @scrollHeight = @container.offsetHeight - @headerHeight
-    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + 2, @columnWidths.length)
-    @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + 2, @nbRows)
+    @nbColsVisible = Math.min( smallest_diff_subsequence(@columnOffset, @scrollWidth) + @colsOverlimit, @columnWidths.length)
+    @nbRowsVisible = Math.min( (@scrollHeight / @rowHeight | 0) + @rowsOverlimit, @nbRows)
 
   _findLeftTopCornerAtXY: (x,y) ->
     # returns the square

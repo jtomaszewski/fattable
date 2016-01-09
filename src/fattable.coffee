@@ -534,7 +534,7 @@ class ScrollBarProxy
     onTouchStart = (event) =>
       @__isTouchDown = true
       @scroller.doTouchStart(getEventTouches(event), event.timeStamp)
-      event.preventDefault()
+      # event.preventDefault()
 
     onTouchMove = (event) =>
       @scroller.doTouchMove(getEventTouches(event), event.timeStamp, event.scale)

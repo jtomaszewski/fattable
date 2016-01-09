@@ -726,8 +726,7 @@
       onTouchStart = (function(_this) {
         return function(event) {
           _this.__isTouchDown = true;
-          _this.scroller.doTouchStart(getEventTouches(event), event.timeStamp);
-          return event.preventDefault();
+          return _this.scroller.doTouchStart(getEventTouches(event), event.timeStamp);
         };
       })(this);
       onTouchMove = (function(_this) {
